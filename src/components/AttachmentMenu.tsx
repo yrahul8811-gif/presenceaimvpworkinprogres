@@ -37,9 +37,9 @@ const AttachmentMenu = ({ isOpen, onClose, onSelect }: AttachmentMenuProps) => {
   return (
     <div
       ref={menuRef}
-      className="absolute bottom-full left-0 mb-2 bg-popover/95 backdrop-blur-xl border border-border rounded-2xl p-3 shadow-xl z-50 animate-fade-in"
+      className="absolute bottom-full left-0 mb-2 bg-popover border border-border rounded-2xl p-3 shadow-xl z-50 animate-fade-in"
     >
-      <div className="grid grid-cols-3 gap-3">
+      <div className="flex flex-row gap-4">
         {options.map((option) => (
           <button
             key={option.type}
@@ -47,10 +47,10 @@ const AttachmentMenu = ({ isOpen, onClose, onSelect }: AttachmentMenuProps) => {
               onSelect(option.type);
               onClose();
             }}
-            className="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-muted transition-colors min-w-[70px]"
+            className="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-muted transition-colors"
           >
             <option.icon className="w-6 h-6 text-foreground/80" />
-            <span className="text-xs text-foreground/80">{option.label}</span>
+            <span className="text-xs text-foreground/80 whitespace-nowrap">{option.label}</span>
           </button>
         ))}
       </div>
