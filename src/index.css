@@ -37,10 +37,10 @@
     --radius: 1rem;
 
     /* Custom colors for moods */
-    --mood-calm: 149 100% 50%;
-    --mood-professional: 60 100% 50%;
-    --mood-sarcastic: 340 100% 50%;
-    --mood-blunt: 200 100% 50%;
+    --mood-calm: 142 71% 45%;
+    --mood-professional: 48 96% 53%;
+    --mood-sarcastic: 0 72% 51%;
+    --mood-blunt: 217 91% 60%;
 
     /* Gradient definitions */
     --gradient-primary: linear-gradient(135deg, hsl(239, 84%, 67%), hsl(263, 70%, 50%));
