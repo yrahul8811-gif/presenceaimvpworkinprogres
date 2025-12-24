@@ -14,6 +14,13 @@ const moods: { type: MoodType; emoji: string; label: string }[] = [
   { type: "blunt", emoji: "🎯", label: "Blunt" },
 ];
 
+const moodColors: Record<MoodType, string> = {
+  calm: "hsl(142, 71%, 45%)",
+  professional: "hsl(48, 96%, 53%)",
+  sarcastic: "hsl(0, 72%, 51%)",
+  blunt: "hsl(217, 91%, 60%)",
+};
+
 const MoodSelector = ({ currentMood, onMoodChange }: MoodSelectorProps) => {
   return (
     <div className="flex gap-2">
@@ -22,9 +29,9 @@ const MoodSelector = ({ currentMood, onMoodChange }: MoodSelectorProps) => {
           key={mood.type}
           onClick={() => onMoodChange(mood.type)}
           title={mood.label}
+          style={{ backgroundColor: moodColors[mood.type] }}
           className={cn(
             "mood-btn",
-            `mood-${mood.type}`,
             currentMood === mood.type && "active"
           )}
         >
