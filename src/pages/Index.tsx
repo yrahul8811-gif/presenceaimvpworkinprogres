@@ -1,15 +1,23 @@
 import { useState, useRef, useEffect } from "react";
 import ChatHeader from "@/components/ChatHeader";
 import ChatMessage from "@/components/ChatMessage";
-import ChatInput from "@/components/ChatInput";
+import ChatInput, { type Attachment } from "@/components/ChatInput";
 import MemoryPanel from "@/components/MemoryPanel";
 import type { MoodType } from "@/components/MoodSelector";
+
+interface MessageAttachment {
+  id: string;
+  name: string;
+  preview: string;
+  type: "image" | "document";
+}
 
 interface Message {
   id: string;
   content: string;
   sender: "user" | "ai";
   timestamp: string;
+  attachments?: MessageAttachment[];
 }
 
 interface ConversationEntry {
@@ -62,18 +70,30 @@ const Index = () => {
     localStorage.setItem("secondLayerMemory", JSON.stringify({ conversations: updated }));
   };
 
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, attachments?: Attachment[]) => {
+    const messageAttachments: MessageAttachment[] | undefined = attachments?.map((a) => ({
+      id: a.id,
+      name: a.file.name,
+      preview: a.preview,
+      type: a.type,
+    }));
+
     const userMessage: Message = {
       id: Date.now().toString(),
       content: text,
       sender: "user",
       timestamp: new Date().toISOString(),
+      attachments: messageAttachments,
     };
     setMessages((prev) => [...prev, userMessage]);
 
+    const attachmentText = attachments && attachments.length > 0 
+      ? ` [${attachments.length} attachment(s)]` 
+      : "";
+
     saveConversation({
       role: "user",
-      content: text,
+      content: text + attachmentText,
       timestamp: userMessage.timestamp,
       mood: MOODS[currentMood],
     });
@@ -260,6 +280,7 @@ Keep responses conversational and appropriate for the ${moodName} mood.`;
               key={message.id}
               content={message.content}
               sender={message.sender}
+              attachments={message.attachments}
             />
           ))}
           <div ref={messagesEndRef} />
