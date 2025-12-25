@@ -275,12 +275,89 @@ Keep responses conversational and appropriate for the ${moodName} mood.`;
     );
   };
 
-  const handleEditMessage = (messageId: string, newContent: string) => {
+  const handleEditMessage = async (messageId: string, newContent: string) => {
+    // Find the message index
+    const messageIndex = messages.findIndex((m) => m.id === messageId);
+    if (messageIndex === -1) return;
+
+    // Update the message content
     setMessages((prev) =>
       prev.map((m) =>
         m.id === messageId ? { ...m, content: newContent } : m
       )
     );
+
+    // If it's a user message, remove the following AI response and regenerate
+    if (messages[messageIndex].sender === "user") {
+      // Find and remove the next AI message
+      const nextAiIndex = messageIndex + 1;
+      if (nextAiIndex < messages.length && messages[nextAiIndex].sender === "ai") {
+        setMessages((prev) => prev.filter((_, i) => i !== nextAiIndex));
+      }
+
+      // Regenerate response with the edited content
+      const apiKey = localStorage.getItem("openai_api_key");
+      if (apiKey) {
+        const typingId = "typing-" + Date.now();
+        setMessages((prev) => [
+          ...prev,
+          { id: typingId, content: "...", sender: "ai", timestamp: new Date().toISOString() },
+        ]);
+
+        try {
+          const conversationHistory = conversations.slice(-10).map((c) => ({
+            role: c.role === "user" ? "user" : "assistant",
+            content: c.content,
+          }));
+
+          const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: "gpt-3.5-turbo",
+              messages: [
+                { role: "system", content: buildSystemPrompt(currentMood) },
+                ...conversationHistory,
+                { role: "user", content: newContent },
+              ],
+              max_tokens: 500,
+              temperature: 0.7,
+            }),
+          });
+
+          setMessages((prev) => prev.filter((m) => m.id !== typingId));
+
+          if (!response.ok) throw new Error(`API Error: ${response.status}`);
+
+          const data = await response.json();
+          const aiResponse = data.choices[0].message.content;
+
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              content: aiResponse,
+              sender: "ai",
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        } catch (error) {
+          setMessages((prev) => prev.filter((m) => m.id !== typingId));
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              content: "⚠️ Error regenerating response. Please try again.",
+              sender: "ai",
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        }
+      }
+    }
   };
 
   const handleRegenerate = async (messageIndex: number) => {
