@@ -3,6 +3,8 @@ import ChatHeader from "@/components/ChatHeader";
 import ChatMessage from "@/components/ChatMessage";
 import ChatInput, { type Attachment } from "@/components/ChatInput";
 import MemoryPanel from "@/components/MemoryPanel";
+import VectorMemoryStatus from "@/components/VectorMemoryStatus";
+import { useVectorMemory } from "@/hooks/useVectorMemory";
 import type { MoodType } from "@/components/MoodSelector";
 
 interface MessageAttachment {
@@ -48,6 +50,16 @@ const Index = () => {
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationEntry[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  const {
+    status: memoryStatus,
+    memoryCount,
+    isProcessing: isMemoryProcessing,
+    initializeModel,
+    storeMemory,
+    recallMemories,
+    clearMemory: clearVectorMemory,
+  } = useVectorMemory();
 
   useEffect(() => {
     const saved = localStorage.getItem("secondLayerMemory");
@@ -99,6 +111,11 @@ const Index = () => {
       mood: MOODS[currentMood],
     });
 
+    // Store user message in vector memory if ready
+    if (memoryStatus === "ready") {
+      storeMemory(text, "user").catch(console.error);
+    }
+
     const apiKey = localStorage.getItem("openai_api_key");
 
     if (apiKey) {
@@ -110,6 +127,13 @@ const Index = () => {
       ]);
 
       try {
+        // Recall relevant memories
+        let recalledMemories: string[] = [];
+        if (memoryStatus === "ready") {
+          const memories = await recallMemories(text, 3, 0.4);
+          recalledMemories = memories.map((m) => `[${m.role}]: ${m.content}`);
+        }
+
         const conversationHistory = conversations.slice(-10).map((c) => ({
           role: c.role === "user" ? "user" : "assistant",
           content: c.content,
@@ -127,7 +151,7 @@ const Index = () => {
             messages: [
               {
                 role: "system",
-                content: buildSystemPrompt(currentMood),
+                content: buildSystemPrompt(currentMood, recalledMemories),
               },
               ...conversationHistory,
             ],
@@ -160,6 +184,11 @@ const Index = () => {
           timestamp: aiMessage.timestamp,
           mood: MOODS[currentMood],
         });
+
+        // Store AI response in vector memory
+        if (memoryStatus === "ready") {
+          storeMemory(aiResponse, "assistant").catch(console.error);
+        }
       } catch (error) {
         // Remove typing indicator
         setMessages((prev) => prev.filter((m) => m.id !== typingId));
@@ -213,9 +242,9 @@ const Index = () => {
     }
   };
 
-  const buildSystemPrompt = (mood: MoodType): string => {
+  const buildSystemPrompt = (mood: MoodType, recalledMemories: string[] = []): string => {
     const moodName = MOODS[mood].toLowerCase();
-    return `You are Presence AI, a personal AI companion. Respond in a ${moodName} tone.
+    let prompt = `You are Presence AI, a personal AI companion. Respond in a ${moodName} tone.
 
 Current mood style:
 - Calm: Warm, reflective, encouraging, asks follow-up questions
@@ -224,6 +253,12 @@ Current mood style:
 - Blunt: Direct, minimal words, straight to the point
 
 Keep responses conversational and appropriate for the ${moodName} mood.`;
+
+    if (recalledMemories.length > 0) {
+      prompt += `\n\n## Relevant memories from past conversations:\n${recalledMemories.join("\n")}`;
+    }
+
+    return prompt;
   };
 
   const handleMoodChange = (mood: MoodType) => {
@@ -256,11 +291,12 @@ Keep responses conversational and appropriate for the ${moodName} mood.`;
     setConversations([]);
     localStorage.removeItem("firstLayerMemory");
     localStorage.removeItem("secondLayerMemory");
+    clearVectorMemory().catch(console.error);
     setMessages((prev) => [
       ...prev,
       {
         id: Date.now().toString(),
-        content: "All memory has been cleared. Starting fresh!",
+        content: "All memory has been cleared (including vector memory). Starting fresh!",
         sender: "ai",
         timestamp: new Date().toISOString(),
       },
@@ -441,10 +477,20 @@ Keep responses conversational and appropriate for the ${moodName} mood.`;
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden">
-      <ChatHeader
-        onMenuClick={() => setIsMemoryOpen(true)}
-        onNewChat={handleNewChat}
-      />
+      <div className="flex items-center justify-between">
+        <ChatHeader
+          onMenuClick={() => setIsMemoryOpen(true)}
+          onNewChat={handleNewChat}
+        />
+        <div className="pr-4">
+          <VectorMemoryStatus
+            status={memoryStatus}
+            memoryCount={memoryCount}
+            isProcessing={isMemoryProcessing}
+            onInitialize={initializeModel}
+          />
+        </div>
+      </div>
 
       <main className="flex-1 overflow-y-auto scrollbar-thin p-4 pb-40">
         <div className="flex flex-col gap-3">
