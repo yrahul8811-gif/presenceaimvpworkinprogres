@@ -18,6 +18,7 @@ interface Message {
   sender: "user" | "ai";
   timestamp: string;
   attachments?: MessageAttachment[];
+  isImportant?: boolean;
 }
 
 interface ConversationEntry {
@@ -266,6 +267,101 @@ Keep responses conversational and appropriate for the ${moodName} mood.`;
     ]);
   };
 
+  const handleMarkImportant = (messageId: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, isImportant: !m.isImportant } : m
+      )
+    );
+  };
+
+  const handleEditMessage = (messageId: string, newContent: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, content: newContent } : m
+      )
+    );
+  };
+
+  const handleRegenerate = async (messageIndex: number) => {
+    // Find the last user message before this AI message
+    let userMessageIndex = messageIndex - 1;
+    while (userMessageIndex >= 0 && messages[userMessageIndex].sender !== "user") {
+      userMessageIndex--;
+    }
+    
+    if (userMessageIndex < 0) return;
+    
+    const userMessage = messages[userMessageIndex];
+    
+    // Remove the AI message being regenerated
+    setMessages((prev) => prev.filter((_, i) => i !== messageIndex));
+    
+    // Resend the user message to get a new response
+    const apiKey = localStorage.getItem("openai_api_key");
+    
+    if (apiKey) {
+      const typingId = "typing-" + Date.now();
+      setMessages((prev) => [
+        ...prev,
+        { id: typingId, content: "...", sender: "ai", timestamp: new Date().toISOString() },
+      ]);
+
+      try {
+        const conversationHistory = conversations.slice(-10).map((c) => ({
+          role: c.role === "user" ? "user" : "assistant",
+          content: c.content,
+        }));
+
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-3.5-turbo",
+            messages: [
+              { role: "system", content: buildSystemPrompt(currentMood) },
+              ...conversationHistory,
+              { role: "user", content: userMessage.content },
+            ],
+            max_tokens: 500,
+            temperature: 0.9,
+          }),
+        });
+
+        setMessages((prev) => prev.filter((m) => m.id !== typingId));
+
+        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+
+        const data = await response.json();
+        const aiResponse = data.choices[0].message.content;
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            content: aiResponse,
+            sender: "ai",
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      } catch (error) {
+        setMessages((prev) => prev.filter((m) => m.id !== typingId));
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            content: "⚠️ Error regenerating response. Please try again.",
+            sender: "ai",
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden">
       <ChatHeader
@@ -275,12 +371,18 @@ Keep responses conversational and appropriate for the ${moodName} mood.`;
 
       <main className="flex-1 overflow-y-auto scrollbar-thin p-4 pb-40">
         <div className="flex flex-col gap-3">
-          {messages.map((message) => (
+          {messages.map((message, index) => (
             <ChatMessage
               key={message.id}
               content={message.content}
               sender={message.sender}
               attachments={message.attachments}
+              isImportant={message.isImportant}
+              onLike={() => console.log("Liked:", message.id)}
+              onDislike={() => console.log("Disliked:", message.id)}
+              onRegenerate={() => handleRegenerate(index)}
+              onMarkImportant={() => handleMarkImportant(message.id)}
+              onEdit={(newContent) => handleEditMessage(message.id, newContent)}
             />
           ))}
           <div ref={messagesEndRef} />
