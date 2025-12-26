@@ -3,10 +3,11 @@ import ChatHeader from "@/components/ChatHeader";
 import ChatMessage from "@/components/ChatMessage";
 import ChatInput, { type Attachment } from "@/components/ChatInput";
 import MemoryPanel from "@/components/MemoryPanel";
-import VectorMemoryStatus from "@/components/VectorMemoryStatus";
-import { useVectorMemory } from "@/hooks/useVectorMemory";
+import MemoryStatus from "@/components/MemoryStatus";
+import { useMemorySystem } from "@/hooks/useMemorySystem";
+import { detectContext } from "@/lib/memory/contextDetector";
 import type { MoodType } from "@/components/MoodSelector";
-
+import type { ContextType } from "@/lib/memory/types";
 interface MessageAttachment {
   id: string;
   name: string;
@@ -50,16 +51,18 @@ const Index = () => {
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationEntry[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [currentContext, setCurrentContext] = useState<ContextType>("general");
   
   const {
     status: memoryStatus,
-    memoryCount,
+    counts: memoryCounts,
     isProcessing: isMemoryProcessing,
     initializeModel,
     storeMemory,
     recallMemories,
-    clearMemory: clearVectorMemory,
-  } = useVectorMemory();
+    clearAllMemory,
+    formatMemoriesForPrompt,
+  } = useMemorySystem();
 
   useEffect(() => {
     const saved = localStorage.getItem("secondLayerMemory");
@@ -111,9 +114,11 @@ const Index = () => {
       mood: MOODS[currentMood],
     });
 
-    // Store user message in vector memory if ready
+    // Store user message and detect context
     if (memoryStatus === "ready") {
-      storeMemory(text, "user").catch(console.error);
+      const detectedContext = detectContext(text);
+      setCurrentContext(detectedContext);
+      storeMemory(text, "user", detectedContext).catch(console.error);
     }
 
     const apiKey = localStorage.getItem("openai_api_key");
@@ -127,11 +132,11 @@ const Index = () => {
       ]);
 
       try {
-        // Recall relevant memories
-        let recalledMemories: string[] = [];
+        // Recall memories using 3-layer system
+        let memoryContext = "";
         if (memoryStatus === "ready") {
-          const memories = await recallMemories(text, 3, 0.4);
-          recalledMemories = memories.map((m) => `[${m.role}]: ${m.content}`);
+          const memories = await recallMemories(text, { topK: 5, contextFilter: currentContext });
+          memoryContext = formatMemoriesForPrompt(memories);
         }
 
         const conversationHistory = conversations.slice(-10).map((c) => ({
@@ -151,7 +156,7 @@ const Index = () => {
             messages: [
               {
                 role: "system",
-                content: buildSystemPrompt(currentMood, recalledMemories),
+                content: buildSystemPrompt(currentMood, memoryContext),
               },
               ...conversationHistory,
             ],
@@ -185,9 +190,9 @@ const Index = () => {
           mood: MOODS[currentMood],
         });
 
-        // Store AI response in vector memory
+        // Store AI response in memory
         if (memoryStatus === "ready") {
-          storeMemory(aiResponse, "assistant").catch(console.error);
+          storeMemory(aiResponse, "assistant", currentContext).catch(console.error);
         }
       } catch (error) {
         // Remove typing indicator
@@ -242,9 +247,9 @@ const Index = () => {
     }
   };
 
-  const buildSystemPrompt = (mood: MoodType, recalledMemories: string[] = []): string => {
+  const buildSystemPrompt = (mood: MoodType, memoryContext: string = ""): string => {
     const moodName = MOODS[mood].toLowerCase();
-    let prompt = `You are Presence AI, a personal AI companion. Respond in a ${moodName} tone.
+    let prompt = `You are Presence AI, a personal AI companion with a sophisticated 3-layer memory system. Respond in a ${moodName} tone.
 
 Current mood style:
 - Calm: Warm, reflective, encouraging, asks follow-up questions
@@ -252,10 +257,16 @@ Current mood style:
 - Sarcastic: Witty, playful, tongue-in-cheek but still helpful
 - Blunt: Direct, minimal words, straight to the point
 
+CRITICAL RULES:
+1. Identity facts (Layer 1) are absolute - NEVER contradict them
+2. If memory shows dietary restrictions, ALWAYS respect them
+3. Reference relevant experiences naturally in conversation
+4. Acknowledge the user's knowledge/skills when relevant
+
 Keep responses conversational and appropriate for the ${moodName} mood.`;
 
-    if (recalledMemories.length > 0) {
-      prompt += `\n\n## Relevant memories from past conversations:\n${recalledMemories.join("\n")}`;
+    if (memoryContext) {
+      prompt += `\n\n${memoryContext}`;
     }
 
     return prompt;
@@ -291,7 +302,7 @@ Keep responses conversational and appropriate for the ${moodName} mood.`;
     setConversations([]);
     localStorage.removeItem("firstLayerMemory");
     localStorage.removeItem("secondLayerMemory");
-    clearVectorMemory().catch(console.error);
+    clearAllMemory().catch(console.error);
     setMessages((prev) => [
       ...prev,
       {
@@ -483,9 +494,9 @@ Keep responses conversational and appropriate for the ${moodName} mood.`;
           onNewChat={handleNewChat}
         />
         <div className="pr-4">
-          <VectorMemoryStatus
+          <MemoryStatus
             status={memoryStatus}
-            memoryCount={memoryCount}
+            counts={memoryCounts}
             isProcessing={isMemoryProcessing}
             onInitialize={initializeModel}
           />
