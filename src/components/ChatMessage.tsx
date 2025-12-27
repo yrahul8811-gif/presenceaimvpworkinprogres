@@ -78,7 +78,7 @@ const ChatMessage = ({
         className={cn(
           "text-sm leading-relaxed",
           sender === "user"
-            ? "px-4 py-3 rounded-2xl gradient-primary text-primary-foreground font-medium"
+            ? "px-4 py-3 rounded-2xl bg-muted/60 text-foreground/90"
             : "text-foreground/90",
           isImportant && "ring-2 ring-yellow-500/50 rounded-lg px-2"
         )}
