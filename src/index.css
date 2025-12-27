@@ -43,7 +43,8 @@
     --mood-blunt: 217 91% 60%;
 
     /* Gradient definitions */
-    --gradient-primary: linear-gradient(135deg, hsl(239, 84%, 67%), hsl(263, 70%, 50%));
+    --gradient-primary: linear-gradient(135deg, hsl(0, 0%, 20%), hsl(0, 0%, 25%));
+    --user-bubble: 0 0% 18%;
     --gradient-send: linear-gradient(135deg, hsl(263, 50%, 65%), hsl(210, 80%, 65%));
     --gradient-ai-bubble: linear-gradient(135deg, hsl(263, 30%, 25%) 0%, hsl(240, 20%, 15%) 100%);
 
