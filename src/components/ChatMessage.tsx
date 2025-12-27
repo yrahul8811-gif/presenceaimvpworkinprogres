@@ -76,11 +76,11 @@ const ChatMessage = ({
     >
       <div
         className={cn(
-          "px-4 py-3 rounded-2xl text-sm leading-relaxed",
+          "text-sm leading-relaxed",
           sender === "user"
-            ? "gradient-primary text-primary-foreground font-medium"
-            : "gradient-ai-bubble border border-primary/20 text-foreground/85",
-          isImportant && "ring-2 ring-yellow-500/50"
+            ? "px-4 py-3 rounded-2xl gradient-primary text-primary-foreground font-medium"
+            : "text-foreground/90",
+          isImportant && "ring-2 ring-yellow-500/50 rounded-lg px-2"
         )}
       >
         {attachments && attachments.length > 0 && (
