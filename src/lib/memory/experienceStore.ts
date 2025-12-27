@@ -4,9 +4,9 @@
 import type { ExperienceEntry, ContextType } from "./types";
 import { cosineSimilarity } from "../vectorStore";
 
-const DB_NAME = "presence-ai-memory";
+const DB_NAME = "presence-ai-experiences";
 const STORE_NAME = "experiences";
-const DB_VERSION = 2;
+const DB_VERSION = 1;
 
 let db: IDBDatabase | null = null;
 
