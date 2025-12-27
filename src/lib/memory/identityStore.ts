@@ -3,9 +3,9 @@
 
 import type { IdentityFact } from "./types";
 
-const DB_NAME = "presence-ai-memory";
+const DB_NAME = "presence-ai-identity";
 const STORE_NAME = "identity";
-const DB_VERSION = 2;
+const DB_VERSION = 1;
 
 let db: IDBDatabase | null = null;
 

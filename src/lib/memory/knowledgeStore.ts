@@ -4,9 +4,9 @@
 import type { KnowledgeEntry } from "./types";
 import { cosineSimilarity } from "../vectorStore";
 
-const DB_NAME = "presence-ai-memory";
+const DB_NAME = "presence-ai-knowledge";
 const STORE_NAME = "knowledge";
-const DB_VERSION = 2;
+const DB_VERSION = 1;
 
 let db: IDBDatabase | null = null;
 
