@@ -131,10 +131,16 @@ const extractIdentityFact = (text: string): { key?: string; value?: string } => 
     return { key: "trait", value };
   }
   
-  // Pattern: "My name is [value]"
+  // Pattern: "My name is [value]" or "I'm [name]" or "I am [name]" (when name-like)
   const nameMatch = lowerText.match(/my name is\s+(\w+)/);
   if (nameMatch) {
     return { key: "name", value: nameMatch[1] };
+  }
+  
+  // Pattern: "I'm [Name]" or "I am [Name]" - check for capitalized name in original text
+  const nameMatch2 = text.match(/(?:I'm|I am)\s+([A-Z][a-z]+)(?:\s|,|\.|\!|$)/);
+  if (nameMatch2) {
+    return { key: "name", value: nameMatch2[1] };
   }
   
   // Pattern: "I don't eat [value]" or "I don't drink [value]"

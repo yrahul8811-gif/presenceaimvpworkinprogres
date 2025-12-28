@@ -4,6 +4,7 @@ import ChatMessage from "@/components/ChatMessage";
 import ChatInput, { type Attachment } from "@/components/ChatInput";
 import MemoryPanel from "@/components/MemoryPanel";
 import MemoryStatus from "@/components/MemoryStatus";
+import MemoryBrowser from "@/components/MemoryBrowser";
 import { useMemorySystem } from "@/hooks/useMemorySystem";
 import { detectContext } from "@/lib/memory/contextDetector";
 import type { MoodType } from "@/components/MoodSelector";
@@ -49,6 +50,7 @@ const Index = () => {
   ]);
   const [currentMood, setCurrentMood] = useState<MoodType>("calm");
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
+  const [isMemoryBrowserOpen, setIsMemoryBrowserOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationEntry[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [currentContext, setCurrentContext] = useState<ContextType>("general");
@@ -61,6 +63,7 @@ const Index = () => {
     storeMemory,
     recallMemories,
     clearAllMemory,
+    refreshCounts,
     formatMemoriesForPrompt,
   } = useMemorySystem();
 
@@ -115,11 +118,10 @@ const Index = () => {
     });
 
     // Store user message and detect context
-    if (memoryStatus === "ready") {
-      const detectedContext = detectContext(text);
-      setCurrentContext(detectedContext);
-      storeMemory(text, "user", detectedContext).catch(console.error);
-    }
+    // Identity facts don't need embeddings, so always try to store
+    const detectedContext = detectContext(text);
+    setCurrentContext(detectedContext);
+    storeMemory(text, "user", detectedContext).catch(console.error);
 
     const apiKey = localStorage.getItem("openai_api_key");
 
@@ -499,6 +501,7 @@ Keep responses conversational and appropriate for the ${moodName} mood.`;
             counts={memoryCounts}
             isProcessing={isMemoryProcessing}
             onInitialize={initializeModel}
+            onOpenBrowser={() => setIsMemoryBrowserOpen(true)}
           />
         </div>
       </div>
@@ -534,6 +537,12 @@ Keep responses conversational and appropriate for the ${moodName} mood.`;
         onClose={() => setIsMemoryOpen(false)}
         conversations={conversations}
         onClearMemory={handleClearMemory}
+      />
+
+      <MemoryBrowser
+        isOpen={isMemoryBrowserOpen}
+        onClose={() => setIsMemoryBrowserOpen(false)}
+        onRefresh={refreshCounts}
       />
     </div>
   );
