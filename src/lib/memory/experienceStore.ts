@@ -2,7 +2,7 @@
 // Stores both structured metadata and embeddings for semantic search
 
 import type { ExperienceEntry, ContextType } from "./types";
-import { cosineSimilarity } from "../vectorStore";
+import { cosineSimilarity } from "./utils";
 
 const DB_NAME = "presence-ai-experiences";
 const STORE_NAME = "experiences";
