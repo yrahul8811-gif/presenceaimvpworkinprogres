@@ -14,6 +14,7 @@ interface MemoryStatusProps {
   counts: MemoryCounts;
   isProcessing: boolean;
   onInitialize: () => void;
+  onOpenBrowser?: () => void;
 }
 
 const MemoryStatus = ({
@@ -21,6 +22,7 @@ const MemoryStatus = ({
   counts,
   isProcessing,
   onInitialize,
+  onOpenBrowser,
 }: MemoryStatusProps) => {
   return (
     <TooltipProvider>
@@ -85,7 +87,10 @@ const MemoryStatus = ({
         
         {/* Layer indicators when ready */}
         {status === "ready" && (
-          <div className="hidden md:flex items-center gap-1.5 border-l border-border/50 pl-2 ml-1">
+          <button
+            onClick={onOpenBrowser}
+            className="hidden md:flex items-center gap-1.5 border-l border-border/50 pl-2 ml-1 hover:opacity-80 transition-opacity cursor-pointer"
+          >
             <Tooltip>
               <TooltipTrigger>
                 <div className="flex items-center gap-1 text-blue-500">
@@ -93,7 +98,7 @@ const MemoryStatus = ({
                   <span>{counts.identity}</span>
                 </div>
               </TooltipTrigger>
-              <TooltipContent>Identity Facts (Layer 1)</TooltipContent>
+              <TooltipContent>Identity Facts (Layer 1) - Click to browse</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger>
@@ -113,7 +118,7 @@ const MemoryStatus = ({
               </TooltipTrigger>
               <TooltipContent>Knowledge (Layer 3)</TooltipContent>
             </Tooltip>
-          </div>
+          </button>
         )}
       </div>
     </TooltipProvider>
