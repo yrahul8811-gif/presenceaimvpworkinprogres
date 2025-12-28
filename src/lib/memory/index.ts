@@ -5,3 +5,4 @@ export * from "./experienceStore";
 export * from "./knowledgeStore";
 export * from "./contextDetector";
 export * from "./memoryRouter";
+export { cleanupLegacyDatabases } from "./utils";

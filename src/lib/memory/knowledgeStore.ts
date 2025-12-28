@@ -2,7 +2,7 @@
 // For skills, concepts, learned facts - semantic similarity is primary
 
 import type { KnowledgeEntry } from "./types";
-import { cosineSimilarity } from "../vectorStore";
+import { cosineSimilarity } from "./utils";
 
 const DB_NAME = "presence-ai-knowledge";
 const STORE_NAME = "knowledge";

@@ -3,9 +3,10 @@ import {
   retrieveMemories, 
   writeMemory, 
   resolveConflict,
+  cleanupLegacyDatabases,
   type RetrievalOptions,
   type WriteResult
-} from "@/lib/memory/memoryRouter";
+} from "@/lib/memory";
 import {
   getAllIdentityFacts,
   clearIdentityMemory,
@@ -77,6 +78,9 @@ export const useMemorySystem = () => {
   }, []);
 
   useEffect(() => {
+    // Clean up any legacy memory databases
+    cleanupLegacyDatabases();
+    
     // Subscribe to embedding status changes
     const unsubscribe = onStatusChange(setStatus);
     
