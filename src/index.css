@@ -118,36 +118,28 @@
 
 @layer components {
   .mood-btn {
-    @apply w-8 h-8 rounded-full border-2 border-transparent cursor-pointer transition-all duration-300;
+    @apply w-9 h-9 rounded-full border-2 border-transparent cursor-pointer transition-all duration-200 flex items-center justify-center text-base;
   }
 
   .mood-btn.active {
-    @apply scale-110;
-    box-shadow: 0 0 12px currentColor;
-  }
-
-  .mood-btn.inactive {
-    @apply opacity-40;
+    @apply border-foreground scale-110;
+    box-shadow: var(--shadow-mood);
   }
 
   .mood-calm {
     background: hsl(var(--mood-calm));
-    color: hsl(var(--mood-calm));
   }
 
   .mood-professional {
     background: hsl(var(--mood-professional));
-    color: hsl(var(--mood-professional));
   }
 
   .mood-sarcastic {
     background: hsl(var(--mood-sarcastic));
-    color: hsl(var(--mood-sarcastic));
   }
 
   .mood-blunt {
     background: hsl(var(--mood-blunt));
-    color: hsl(var(--mood-blunt));
   }
 
   .message-slide-in {
@@ -167,20 +159,5 @@
 
   .panel-slide {
     transition: transform 0.3s ease;
-  }
-
-  .send-btn-enter {
-    animation: sendBtnPop 0.2s ease-out forwards;
-  }
-
-  @keyframes sendBtnPop {
-    from {
-      opacity: 0;
-      transform: scale(0.8);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
   }
 }
