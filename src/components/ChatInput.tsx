@@ -168,7 +168,7 @@ const ChatInput = ({ onSend, currentMood, onMoodChange }: ChatInputProps) => {
 
       {/* Input Row */}
       <div className="flex items-end gap-2 mb-3">
-        <div className="flex-1 bg-muted/50 border border-border rounded-3xl px-4 py-2 min-h-[44px] flex items-center">
+        <div className="flex-1 bg-muted/30 border border-border/50 rounded-3xl px-4 py-2 min-h-[44px] flex items-center">
           <textarea
             ref={textareaRef}
             value={message}
@@ -176,17 +176,19 @@ const ChatInput = ({ onSend, currentMood, onMoodChange }: ChatInputProps) => {
             onKeyDown={handleKeyDown}
             placeholder="Message Presence AI..."
             rows={1}
-            className="flex-1 bg-transparent border-none text-foreground text-[15px] outline-none resize-none max-h-[120px] leading-relaxed placeholder:text-muted-foreground"
+            className="flex-1 bg-transparent border-none text-foreground text-[15px] outline-none resize-none max-h-[120px] leading-relaxed placeholder:text-muted-foreground/60"
           />
         </div>
         
-        <Button
-          onClick={handleSend}
-          size="icon"
-          className="w-11 h-11 rounded-full gradient-send border-none hover:opacity-90 transition-opacity flex-shrink-0"
-        >
-          <Send className="w-5 h-5 text-primary-foreground" />
-        </Button>
+        {(message.trim() || attachments.length > 0) && (
+          <Button
+            onClick={handleSend}
+            size="icon"
+            className="w-11 h-11 rounded-full gradient-send border-none hover:opacity-90 transition-opacity flex-shrink-0 send-btn-enter"
+          >
+            <Send className="w-5 h-5 text-primary-foreground" />
+          </Button>
+        )}
       </div>
 
       {/* Moods Row */}

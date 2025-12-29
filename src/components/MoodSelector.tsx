@@ -7,19 +7,12 @@ interface MoodSelectorProps {
   onMoodChange: (mood: MoodType) => void;
 }
 
-const moods: { type: MoodType; emoji: string; label: string }[] = [
-  { type: "calm", emoji: "😌", label: "Calm" },
-  { type: "professional", emoji: "💼", label: "Professional" },
-  { type: "sarcastic", emoji: "😏", label: "Sarcastic" },
-  { type: "blunt", emoji: "🎯", label: "Blunt" },
+const moods: { type: MoodType; label: string }[] = [
+  { type: "calm", label: "Calm" },
+  { type: "professional", label: "Professional" },
+  { type: "sarcastic", label: "Sarcastic" },
+  { type: "blunt", label: "Blunt" },
 ];
-
-const moodColors: Record<MoodType, string> = {
-  calm: "hsl(142, 71%, 45%)",
-  professional: "hsl(48, 96%, 53%)",
-  sarcastic: "hsl(0, 72%, 51%)",
-  blunt: "hsl(217, 91%, 60%)",
-};
 
 const MoodSelector = ({ currentMood, onMoodChange }: MoodSelectorProps) => {
   return (
@@ -29,14 +22,11 @@ const MoodSelector = ({ currentMood, onMoodChange }: MoodSelectorProps) => {
           key={mood.type}
           onClick={() => onMoodChange(mood.type)}
           title={mood.label}
-          style={{ backgroundColor: moodColors[mood.type] }}
           className={cn(
-            "mood-btn",
-            currentMood === mood.type && "active"
+            `mood-btn mood-${mood.type}`,
+            currentMood === mood.type ? "active" : "inactive"
           )}
-        >
-          {mood.emoji}
-        </button>
+        />
       ))}
     </div>
   );
