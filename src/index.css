@@ -122,12 +122,12 @@
   }
 
   .mood-btn.active {
-    @apply scale-110 brightness-110;
-    box-shadow: 0 0 14px currentColor;
+    @apply scale-110;
+    box-shadow: 0 0 12px currentColor;
   }
 
   .mood-btn.inactive {
-    @apply brightness-50;
+    @apply opacity-40;
   }
 
   .mood-calm {
