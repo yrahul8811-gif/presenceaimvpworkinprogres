@@ -119,11 +119,13 @@
 @layer components {
   .mood-btn {
     @apply w-9 h-9 rounded-full border-2 border-transparent cursor-pointer transition-all duration-200 flex items-center justify-center text-base;
+    filter: brightness(0.5);
   }
 
   .mood-btn.active {
     @apply border-foreground scale-110;
     box-shadow: var(--shadow-mood);
+    filter: brightness(1);
   }
 
   .mood-calm {
