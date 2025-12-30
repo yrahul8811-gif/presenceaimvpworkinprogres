@@ -183,9 +183,9 @@ const ChatInput = ({ onSend, currentMood, onMoodChange }: ChatInputProps) => {
         <Button
           onClick={handleSend}
           size="icon"
-          className="w-11 h-11 rounded-full gradient-send border-none hover:opacity-90 transition-opacity flex-shrink-0"
+          className="w-11 h-11 rounded-full bg-muted hover:bg-muted/80 border-none transition-opacity flex-shrink-0"
         >
-          <Send className="w-5 h-5 text-primary-foreground" />
+          <Send className="w-5 h-5 text-muted-foreground" />
         </Button>
       </div>
 

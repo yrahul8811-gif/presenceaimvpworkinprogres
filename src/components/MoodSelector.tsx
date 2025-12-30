@@ -7,11 +7,11 @@ interface MoodSelectorProps {
   onMoodChange: (mood: MoodType) => void;
 }
 
-const moods: { type: MoodType; emoji: string; label: string }[] = [
-  { type: "calm", emoji: "😌", label: "Calm" },
-  { type: "professional", emoji: "💼", label: "Professional" },
-  { type: "sarcastic", emoji: "😏", label: "Sarcastic" },
-  { type: "blunt", emoji: "🎯", label: "Blunt" },
+const moods: { type: MoodType; label: string }[] = [
+  { type: "calm", label: "Calm" },
+  { type: "professional", label: "Professional" },
+  { type: "sarcastic", label: "Sarcastic" },
+  { type: "blunt", label: "Blunt" },
 ];
 
 const moodColors: Record<MoodType, string> = {
@@ -34,9 +34,8 @@ const MoodSelector = ({ currentMood, onMoodChange }: MoodSelectorProps) => {
             "mood-btn",
             currentMood === mood.type && "active"
           )}
-        >
-          {mood.emoji}
-        </button>
+          aria-label={mood.label}
+        />
       ))}
     </div>
   );
