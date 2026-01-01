@@ -5,10 +5,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { getAllIdentityFacts, deleteIdentityFact } from "@/lib/memory/identityStore";
-import { getAllExperiences, deleteExperience } from "@/lib/memory/experienceStore";
-import { getAllKnowledge, deleteKnowledge } from "@/lib/memory/knowledgeStore";
-import type { IdentityFact, ExperienceEntry, KnowledgeEntry } from "@/lib/memory/types";
+import { 
+  getAllIdentityFacts, 
+  deleteIdentityFact,
+  getAllExperiences,
+  deleteExperience,
+  getAllKnowledge,
+  deleteKnowledge,
+  type IdentityFact,
+  type ExperienceEntry,
+  type KnowledgeEntry,
+} from "@/lib/memory";
 
 interface MemoryBrowserProps {
   isOpen: boolean;
@@ -104,15 +111,15 @@ const MemoryBrowser = ({ isOpen, onClose, onRefresh }: MemoryBrowserProps) => {
           <TabsList className="mx-6 mt-4 grid grid-cols-3">
             <TabsTrigger value="identity" className="flex items-center gap-2">
               <Brain className="w-4 h-4" />
-              Identity ({identityFacts.length})
+              IMM ({identityFacts.length})
             </TabsTrigger>
             <TabsTrigger value="experience" className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              Experience ({experiences.length})
+              EMM ({experiences.length})
             </TabsTrigger>
             <TabsTrigger value="knowledge" className="flex items-center gap-2">
               <Lightbulb className="w-4 h-4" />
-              Knowledge ({knowledge.length})
+              KMM ({knowledge.length})
             </TabsTrigger>
           </TabsList>
 

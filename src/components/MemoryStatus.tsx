@@ -1,6 +1,6 @@
 import { Brain, Loader2, CheckCircle, AlertCircle, User, MessageSquare, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { EmbeddingStatus } from "@/lib/embeddings";
+import type { EmbeddingStatus } from "@/lib/memory";
 import type { MemoryCounts } from "@/hooks/useMemorySystem";
 import {
   Tooltip,
@@ -60,24 +60,24 @@ const MemoryStatus = ({
           <TooltipContent side="bottom" className="p-3">
             <div className="space-y-2 text-xs">
               <div className="font-medium mb-2">
-                {status === "idle" && "Click to initialize 3-layer memory"}
+                {status === "idle" && "Click to initialize ML router + embeddings"}
                 {status === "loading" && "Loading embedding model..."}
-                {status === "ready" && "Memory System Active"}
+                {status === "ready" && "Memory System Active (ML Router)"}
                 {status === "error" && "Error loading model"}
               </div>
               {status === "ready" && (
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
                     <User className="w-3 h-3 text-blue-500" />
-                    <span>Identity: {counts.identity} facts</span>
+                    <span>IMM: {counts.identity} facts</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <MessageSquare className="w-3 h-3 text-purple-500" />
-                    <span>Experience: {counts.experience} entries</span>
+                    <span>EMM: {counts.experience} entries</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-3 h-3 text-amber-500" />
-                    <span>Knowledge: {counts.knowledge} items</span>
+                    <span>KMM: {counts.knowledge} items</span>
                   </div>
                 </div>
               )}
@@ -98,7 +98,7 @@ const MemoryStatus = ({
                   <span>{counts.identity}</span>
                 </div>
               </TooltipTrigger>
-              <TooltipContent>Identity Facts (Layer 1) - Click to browse</TooltipContent>
+              <TooltipContent>IMM - Identity Facts</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger>
@@ -107,7 +107,7 @@ const MemoryStatus = ({
                   <span>{counts.experience}</span>
                 </div>
               </TooltipTrigger>
-              <TooltipContent>Experiences (Layer 2)</TooltipContent>
+              <TooltipContent>EMM - Experiences</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger>
@@ -116,7 +116,7 @@ const MemoryStatus = ({
                   <span>{counts.knowledge}</span>
                 </div>
               </TooltipTrigger>
-              <TooltipContent>Knowledge (Layer 3)</TooltipContent>
+              <TooltipContent>KMM - Knowledge</TooltipContent>
             </Tooltip>
           </button>
         )}

@@ -1,12 +1,11 @@
-// Local embeddings using HuggingFace Transformers.js
+// Browser-compatible embedding service using HuggingFace Transformers.js
 import { pipeline } from "@huggingface/transformers";
+
+export type EmbeddingStatus = "idle" | "loading" | "ready" | "error";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let extractor: any = null;
 let loadingPromise: Promise<any> | null = null;
-
-export type EmbeddingStatus = "idle" | "loading" | "ready" | "error";
-
 let statusListeners: ((status: EmbeddingStatus) => void)[] = [];
 let currentStatus: EmbeddingStatus = "idle";
 
@@ -33,7 +32,7 @@ export const initEmbeddings = async () => {
 
   loadingPromise = (async () => {
     try {
-      // Use a small, fast model for embeddings - try WebGPU first
+      // Try WebGPU first for better performance
       extractor = await pipeline(
         "feature-extraction",
         "Xenova/all-MiniLM-L6-v2",
@@ -64,28 +63,21 @@ export const initEmbeddings = async () => {
 
 export const generateEmbedding = async (text: string): Promise<number[]> => {
   const model = await initEmbeddings();
-  
-  // Generate embedding
-  const output = await model(text, { 
-    pooling: "mean", 
-    normalize: true 
-  });
-  
-  // Convert to array
+  const output = await model(text, { pooling: "mean", normalize: true });
   return Array.from(output.data as Float32Array);
 };
 
 export const generateEmbeddings = async (texts: string[]): Promise<number[][]> => {
-  const model = await initEmbeddings();
-  
   const results: number[][] = [];
   for (const text of texts) {
-    const output = await model(text, { 
-      pooling: "mean", 
-      normalize: true 
-    });
-    results.push(Array.from(output.data as Float32Array));
+    const emb = await generateEmbedding(text);
+    results.push(emb);
   }
-  
   return results;
+};
+
+// Get embedding dimension (384 for all-MiniLM-L6-v2)
+export const getEmbeddingDimension = async (): Promise<number> => {
+  const testEmb = await generateEmbedding("test");
+  return testEmb.length;
 };

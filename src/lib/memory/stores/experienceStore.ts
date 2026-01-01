@@ -1,19 +1,19 @@
-// Layer 2: Experience Memory Store (Hybrid DB + Vector)
-// Stores both structured metadata and embeddings for semantic search
+// Layer 2: Experience Memory Store (EMM)
+// Hybrid DB + Vector for contextual events
 
-import type { ExperienceEntry, ContextType } from "./types";
-import { cosineSimilarity } from "./utils";
+import type { ExperienceEntry, ContextType } from "../types";
+import { cosineSimilarity } from "../utils";
 
 const DB_NAME = "presence-ai-experiences";
 const STORE_NAME = "experiences";
 const DB_VERSION = 1;
 
-let db: IDBDatabase | null = null;
-
 // Decay configuration
 const DECAY_RATE = 0.95; // Per day
 const MIN_IMPORTANCE = 0.1;
 const IMPORTANCE_THRESHOLD = 0.2;
+
+let db: IDBDatabase | null = null;
 
 export const initExperienceDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
@@ -118,7 +118,7 @@ export const searchExperiencesSemantic = async (
   return results;
 };
 
-// Apply decay to all experiences (should be called periodically)
+// Apply decay to all experiences
 export const applyExperienceDecay = async (): Promise<void> => {
   const database = await initExperienceDB();
   const experiences = await getAllExperiences();
@@ -139,7 +139,7 @@ export const applyExperienceDecay = async (): Promise<void> => {
   }
 };
 
-// Get recent experiences (no semantic search, just recency)
+// Get recent experiences
 export const getRecentExperiences = async (
   limit: number = 10,
   contextFilter?: ContextType
