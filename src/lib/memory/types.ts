@@ -1,7 +1,18 @@
-// Memory System Types - Three Layer Architecture
+// Memory System Types - Production Router Architecture
+// IMM = Identity Memory, EMM = Experience Memory, KMM = Knowledge Memory
 
-export type MemoryLayer = "identity" | "experience" | "knowledge";
+export type Layer = "IMM" | "EMM" | "KMM";
+export type Decision = Layer | "ASK" | "CONFLICT" | "NONE";
 export type ContextType = "general" | "family" | "work" | "college" | "personal" | "health" | "hobby";
+
+// Routing result from ML classifier
+export interface RoutingResult {
+  decision: Decision;
+  confidence: number;
+  probabilities: Record<Layer, number>;
+  source: "RULE" | "ML";
+  reasoning: string;
+}
 
 // Layer 1: Identity Memory - Exact facts, never use vectors
 export interface IdentityFact {
@@ -43,7 +54,7 @@ export interface KnowledgeEntry {
 
 // Retrieval result with layer info
 export interface MemoryResult {
-  layer: MemoryLayer;
+  layer: Layer;
   content: string;
   confidence: number;
   similarity?: number;            // Only for vector results
@@ -56,7 +67,7 @@ export interface MemoryWriteRequest {
   content: string;
   role: "user" | "assistant";
   context?: ContextType;
-  forceLayer?: MemoryLayer;       // Override automatic routing
+  forceLayer?: Layer;             // Override automatic routing
 }
 
 // Conflict info
@@ -64,4 +75,27 @@ export interface MemoryConflict {
   existingFact: IdentityFact;
   newValue: string;
   suggestedAction: "ask_user" | "update" | "ignore";
+}
+
+// Write result
+export interface WriteResult {
+  success: boolean;
+  layer: Layer;
+  conflict?: MemoryConflict;
+  message?: string;
+}
+
+// Router weights for persistence
+export interface RouterWeights {
+  IMM: number[];
+  EMM: number[];
+  KMM: number[];
+}
+
+// Correction history for learning
+export interface CorrectionEntry {
+  text: string;
+  context: string[];
+  correct: Layer;
+  timestamp: string;
 }

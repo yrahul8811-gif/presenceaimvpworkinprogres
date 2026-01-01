@@ -1,15 +1,16 @@
-// Layer 1: Identity Memory Store (Structured DB Only)
-// Accuracy: 99% - Never use vectors, never blur facts
+// Layer 3: Knowledge Memory Store (KMM)
+// Vector-first with metadata for skills and concepts
 
-import type { IdentityFact } from "./types";
+import type { KnowledgeEntry } from "../types";
+import { cosineSimilarity } from "../utils";
 
-const DB_NAME = "presence-ai-identity";
-const STORE_NAME = "identity";
+const DB_NAME = "presence-ai-knowledge";
+const STORE_NAME = "knowledge";
 const DB_VERSION = 1;
 
 let db: IDBDatabase | null = null;
 
-export const initIdentityDB = (): Promise<IDBDatabase> => {
+export const initKnowledgeDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
     if (db) {
       resolve(db);
@@ -27,51 +28,29 @@ export const initIdentityDB = (): Promise<IDBDatabase> => {
     request.onupgradeneeded = (event) => {
       const database = (event.target as IDBOpenDBRequest).result;
       
-      // Identity store - structured, exact facts
       if (!database.objectStoreNames.contains(STORE_NAME)) {
         const store = database.createObjectStore(STORE_NAME, { keyPath: "id" });
-        store.createIndex("key", "key", { unique: false });
         store.createIndex("category", "category", { unique: false });
         store.createIndex("confidence", "confidence", { unique: false });
+        store.createIndex("timestamp", "timestamp", { unique: false });
       }
     };
   });
 };
 
-export const addIdentityFact = async (fact: IdentityFact): Promise<void> => {
-  const database = await initIdentityDB();
+export const addKnowledge = async (entry: KnowledgeEntry): Promise<void> => {
+  const database = await initKnowledgeDB();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORE_NAME], "readwrite");
     const store = transaction.objectStore(STORE_NAME);
-    const request = store.put(fact);
+    const request = store.put(entry);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve();
   });
 };
 
-export const getIdentityByKey = async (key: string): Promise<IdentityFact | null> => {
-  const database = await initIdentityDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([STORE_NAME], "readonly");
-    const store = transaction.objectStore(STORE_NAME);
-    const index = store.index("key");
-    const request = index.getAll(key);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const results = request.result;
-      if (results.length === 0) {
-        resolve(null);
-      } else {
-        // Return highest confidence fact for this key
-        const sorted = results.sort((a, b) => b.confidence - a.confidence);
-        resolve(sorted[0]);
-      }
-    };
-  });
-};
-
-export const getAllIdentityFacts = async (): Promise<IdentityFact[]> => {
-  const database = await initIdentityDB();
+export const getAllKnowledge = async (): Promise<KnowledgeEntry[]> => {
+  const database = await initKnowledgeDB();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORE_NAME], "readonly");
     const store = transaction.objectStore(STORE_NAME);
@@ -81,23 +60,61 @@ export const getAllIdentityFacts = async (): Promise<IdentityFact[]> => {
   });
 };
 
-export const updateIdentityConfidence = async (
-  id: string, 
-  newConfidence: number
-): Promise<void> => {
-  const database = await initIdentityDB();
+// Primary search method - semantic similarity
+export const searchKnowledgeSemantic = async (
+  queryEmbedding: number[],
+  topK: number = 5,
+  threshold: number = 0.3
+): Promise<(KnowledgeEntry & { similarity: number })[]> => {
+  const knowledge = await getAllKnowledge();
+  
+  const results = knowledge
+    .map((entry) => {
+      const similarity = cosineSimilarity(queryEmbedding, entry.embedding);
+      // Boost by reinforcement count
+      const reinforcementBoost = 1 + (entry.reinforcementCount * 0.1);
+      const weightedScore = similarity * entry.confidence * Math.min(reinforcementBoost, 2);
+      
+      return {
+        ...entry,
+        similarity: weightedScore,
+      };
+    })
+    .filter((entry) => entry.similarity >= threshold)
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, topK);
+  
+  return results;
+};
+
+export const getKnowledgeByCategory = async (
+  category: string
+): Promise<KnowledgeEntry[]> => {
+  const database = await initKnowledgeDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORE_NAME], "readonly");
+    const store = transaction.objectStore(STORE_NAME);
+    const index = store.index("category");
+    const request = index.getAll(category);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+  });
+};
+
+// Reinforce knowledge when referenced
+export const reinforceKnowledge = async (id: string): Promise<void> => {
+  const database = await initKnowledgeDB();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORE_NAME], "readwrite");
     const store = transaction.objectStore(STORE_NAME);
     const getRequest = store.get(id);
     
     getRequest.onsuccess = () => {
-      const fact = getRequest.result as IdentityFact;
-      if (fact) {
-        fact.confidence = Math.min(1, newConfidence);
-        fact.confirmationCount += 1;
-        fact.lastConfirmed = new Date().toISOString();
-        const putRequest = store.put(fact);
+      const entry = getRequest.result as KnowledgeEntry;
+      if (entry) {
+        entry.reinforcementCount += 1;
+        entry.confidence = Math.min(1, entry.confidence + 0.05);
+        const putRequest = store.put(entry);
         putRequest.onerror = () => reject(putRequest.error);
         putRequest.onsuccess = () => resolve();
       } else {
@@ -108,8 +125,8 @@ export const updateIdentityConfidence = async (
   });
 };
 
-export const deleteIdentityFact = async (id: string): Promise<void> => {
-  const database = await initIdentityDB();
+export const deleteKnowledge = async (id: string): Promise<void> => {
+  const database = await initKnowledgeDB();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORE_NAME], "readwrite");
     const store = transaction.objectStore(STORE_NAME);
@@ -119,8 +136,8 @@ export const deleteIdentityFact = async (id: string): Promise<void> => {
   });
 };
 
-export const clearIdentityMemory = async (): Promise<void> => {
-  const database = await initIdentityDB();
+export const clearKnowledgeMemory = async (): Promise<void> => {
+  const database = await initKnowledgeDB();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORE_NAME], "readwrite");
     const store = transaction.objectStore(STORE_NAME);
@@ -130,8 +147,8 @@ export const clearIdentityMemory = async (): Promise<void> => {
   });
 };
 
-export const getIdentityCount = async (): Promise<number> => {
-  const database = await initIdentityDB();
+export const getKnowledgeCount = async (): Promise<number> => {
+  const database = await initKnowledgeDB();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORE_NAME], "readonly");
     const store = transaction.objectStore(STORE_NAME);
@@ -139,16 +156,4 @@ export const getIdentityCount = async (): Promise<number> => {
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
   });
-};
-
-// Search identity facts by keyword (exact match on key or category)
-export const searchIdentityFacts = async (query: string): Promise<IdentityFact[]> => {
-  const all = await getAllIdentityFacts();
-  const lowerQuery = query.toLowerCase();
-  
-  return all.filter(fact => 
-    fact.key.toLowerCase().includes(lowerQuery) ||
-    fact.value.toLowerCase().includes(lowerQuery) ||
-    fact.category.toLowerCase().includes(lowerQuery)
-  ).sort((a, b) => b.confidence - a.confidence);
 };

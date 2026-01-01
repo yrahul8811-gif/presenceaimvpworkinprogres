@@ -6,9 +6,8 @@ import MemoryPanel from "@/components/MemoryPanel";
 import MemoryStatus from "@/components/MemoryStatus";
 import MemoryBrowser from "@/components/MemoryBrowser";
 import { useMemorySystem } from "@/hooks/useMemorySystem";
-import { detectContext } from "@/lib/memory/contextDetector";
+import { detectContext, type ContextType } from "@/lib/memory";
 import type { MoodType } from "@/components/MoodSelector";
-import type { ContextType } from "@/lib/memory/types";
 interface MessageAttachment {
   id: string;
   name: string;

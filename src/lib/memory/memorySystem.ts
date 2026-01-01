@@ -1,38 +1,44 @@
-// Memory Router - Core routing logic for the three-layer memory system
-// Retrieval order: Identity (IMM) → Experience (EMM) → Knowledge (KMM)
+// Main Memory System - Coordinates router and stores
 
 import type { 
+  Layer, 
+  ContextType, 
   MemoryResult, 
   MemoryWriteRequest, 
-  IdentityFact, 
-  ExperienceEntry, 
+  WriteResult,
+  IdentityFact,
+  ExperienceEntry,
   KnowledgeEntry,
-  ContextType,
-  MemoryConflict 
+  MemoryConflict
 } from "./types";
-import { 
-  getAllIdentityFacts, 
-  searchIdentityFacts, 
+import { router } from "./router";
+import { extractIdentityFact } from "./hardRules";
+import { generateEmbedding, getEmbeddingStatus, initEmbeddings } from "./embeddings";
+import { calculateImportance, generateId, detectContext } from "./utils";
+import {
   addIdentityFact,
   getIdentityByKey,
-  updateIdentityConfidence
-} from "./identityStore";
-import { 
-  searchExperiencesSemantic, 
-  getRecentExperiences,
+  updateIdentityConfidence,
+  getAllIdentityFacts,
+  searchIdentityFacts,
+  clearIdentityMemory,
+  getIdentityCount,
+} from "./stores/identityStore";
+import {
   addExperience,
-  getExperiencesByContext
-} from "./experienceStore";
-import { 
-  searchKnowledgeSemantic,
+  searchExperiencesSemantic,
+  getAllExperiences,
+  clearExperienceMemory,
+  getExperienceCount,
+  applyExperienceDecay,
+} from "./stores/experienceStore";
+import {
   addKnowledge,
-  reinforceKnowledge
-} from "./knowledgeStore";
-import { detectMemoryIntent, calculateImportance } from "./contextDetector";
-import { generateEmbedding, getEmbeddingStatus, initEmbeddings } from "../embeddings";
-
-const CONFIDENCE_THRESHOLD = 0.5;
-const MIN_CONFIRMATIONS_FOR_IDENTITY = 1; // Can be increased for stricter identity writes
+  searchKnowledgeSemantic,
+  getAllKnowledge,
+  clearKnowledgeMemory,
+  getKnowledgeCount,
+} from "./stores/knowledgeStore";
 
 export interface RetrievalOptions {
   contextFilter?: ContextType;
@@ -43,14 +49,14 @@ export interface RetrievalOptions {
   semanticThreshold?: number;
 }
 
-export interface WriteResult {
-  success: boolean;
-  layer: "identity" | "experience" | "knowledge";
-  conflict?: MemoryConflict;
-  message?: string;
-}
+const CONFIDENCE_THRESHOLD = 0.5;
 
-// Main retrieval pipeline - follows strict precedence
+// Initialize the memory system
+export const initMemorySystem = async (): Promise<void> => {
+  await router.init();
+};
+
+// Main retrieval pipeline - follows strict precedence: IMM → EMM → KMM
 export const retrieveMemories = async (
   query: string,
   options: RetrievalOptions = {}
@@ -65,7 +71,6 @@ export const retrieveMemories = async (
   } = options;
 
   const results: MemoryResult[] = [];
-  const detection = detectMemoryIntent(query);
 
   // Step 1: Query Identity Memory first (exact, highest priority)
   if (includeIdentity) {
@@ -73,7 +78,7 @@ export const retrieveMemories = async (
     for (const fact of identityResults.slice(0, 3)) {
       if (fact.confidence >= CONFIDENCE_THRESHOLD) {
         results.push({
-          layer: "identity",
+          layer: "IMM",
           content: `${fact.key}: ${fact.value}`,
           confidence: fact.confidence,
           timestamp: fact.lastConfirmed,
@@ -86,22 +91,20 @@ export const retrieveMemories = async (
     }
   }
 
-  // Step 2: Query Experience Memory (filter by context first, then semantic)
+  // Step 2: Query Experience Memory (semantic search)
   if (includeExperience && getEmbeddingStatus() === "ready") {
     try {
       const queryEmbedding = await generateEmbedding(query);
-      
-      // First, try context-filtered search
       const contextExperiences = await searchExperiencesSemantic(
         queryEmbedding,
         topK,
         semanticThreshold,
-        contextFilter || detection.context !== "general" ? detection.context : undefined
+        contextFilter
       );
       
       for (const exp of contextExperiences) {
         results.push({
-          layer: "experience",
+          layer: "EMM",
           content: exp.content,
           confidence: exp.importance,
           similarity: exp.similarity,
@@ -111,29 +114,6 @@ export const retrieveMemories = async (
             role: exp.role 
           },
         });
-      }
-      
-      // If not enough results, search without context filter
-      if (results.filter(r => r.layer === "experience").length < topK / 2) {
-        const generalExperiences = await searchExperiencesSemantic(
-          queryEmbedding,
-          topK,
-          semanticThreshold
-        );
-        
-        const existingIds = new Set(results.map(r => r.content));
-        for (const exp of generalExperiences) {
-          if (!existingIds.has(exp.content)) {
-            results.push({
-              layer: "experience",
-              content: exp.content,
-              confidence: exp.importance,
-              similarity: exp.similarity,
-              timestamp: exp.timestamp,
-              metadata: { context: exp.context, role: exp.role },
-            });
-          }
-        }
       }
     } catch (error) {
       console.warn("Experience search failed:", error);
@@ -147,12 +127,12 @@ export const retrieveMemories = async (
       const knowledgeResults = await searchKnowledgeSemantic(
         queryEmbedding,
         topK,
-        semanticThreshold * 0.8 // Lower threshold for knowledge
+        semanticThreshold * 0.8
       );
       
       for (const know of knowledgeResults) {
         results.push({
-          layer: "knowledge",
+          layer: "KMM",
           content: know.content,
           confidence: know.confidence,
           similarity: know.similarity,
@@ -168,99 +148,116 @@ export const retrieveMemories = async (
     }
   }
 
-  // Apply precedence rules: sort by layer priority, then by confidence/similarity
+  // Sort by layer priority, then by confidence
   return results.sort((a, b) => {
-    const layerPriority = { identity: 3, experience: 2, knowledge: 1 };
+    const layerPriority = { IMM: 3, EMM: 2, KMM: 1 };
     const layerDiff = layerPriority[b.layer] - layerPriority[a.layer];
     if (layerDiff !== 0) return layerDiff;
     
-    // Within same layer, sort by confidence/similarity
     const aScore = a.similarity || a.confidence;
     const bScore = b.similarity || b.confidence;
     return bScore - aScore;
   }).slice(0, topK);
 };
 
-// Write memory with automatic layer routing
+// Write memory with ML-based routing
 export const writeMemory = async (
   request: MemoryWriteRequest
 ): Promise<WriteResult> => {
   const { content, role, context = "general", forceLayer } = request;
-  const detection = detectMemoryIntent(content);
   
-  // Determine target layer
-  const targetLayer = forceLayer || detection.suggestedLayer;
+  // Use router to determine layer
+  let targetLayer: Layer;
   
-  // Ensure embeddings are ready for experience/knowledge
-  if ((targetLayer === "experience" || targetLayer === "knowledge") && getEmbeddingStatus() !== "ready") {
-    try {
-      await initEmbeddings();
-    } catch (error) {
-      console.warn("Could not initialize embeddings, falling back to experience without vector");
+  if (forceLayer) {
+    targetLayer = forceLayer;
+  } else {
+    const routingResult = await router.route(content, []);
+    
+    if (routingResult.decision === "NONE") {
+      return {
+        success: false,
+        layer: "EMM",
+        message: "Content blocked by safety rules",
+      };
+    }
+    
+    if (routingResult.decision === "ASK" || routingResult.decision === "CONFLICT") {
+      // Default to EMM when uncertain
+      targetLayer = "EMM";
+    } else {
+      targetLayer = routingResult.decision;
     }
   }
   
+  // Ensure embeddings ready for EMM/KMM
+  if ((targetLayer === "EMM" || targetLayer === "KMM") && getEmbeddingStatus() !== "ready") {
+    try {
+      await initEmbeddings();
+    } catch (error) {
+      console.warn("Could not initialize embeddings");
+    }
+  }
+  
+  // Route to appropriate store
   switch (targetLayer) {
-    case "identity":
-      return await writeIdentity(content, detection);
-    case "experience":
-      return await writeExperience(content, role, context || detection.context);
-    case "knowledge":
-      return await writeKnowledge(content, detection);
+    case "IMM":
+      return await writeIdentity(content);
+    case "EMM":
+      return await writeExperience(content, role, context);
+    case "KMM":
+      return await writeKnowledge(content);
     default:
-      return await writeExperience(content, role, context || detection.context);
+      return await writeExperience(content, role, context);
   }
 };
 
-// Write to Identity Memory (strict rules)
-const writeIdentity = async (
-  content: string,
-  detection: ReturnType<typeof detectMemoryIntent>
-): Promise<WriteResult> => {
-  if (!detection.extractedKey || !detection.extractedValue) {
-    // Can't extract identity fact, store as experience instead
+// Write to Identity Memory
+const writeIdentity = async (content: string): Promise<WriteResult> => {
+  const extraction = extractIdentityFact(content);
+  
+  if (!extraction.key || !extraction.value) {
     return {
       success: false,
-      layer: "identity",
-      message: "Could not extract identity fact, consider storing as experience",
+      layer: "IMM",
+      message: "Could not extract identity fact",
     };
   }
   
-  // Check for existing fact with same key
-  const existing = await getIdentityByKey(detection.extractedKey);
+  // Check for existing fact
+  const existing = await getIdentityByKey(extraction.key);
   
   if (existing) {
-    // Check for conflict
-    if (existing.value.toLowerCase() !== detection.extractedValue.toLowerCase()) {
-      // Conflict detected!
+    if (existing.value.toLowerCase() !== extraction.value.toLowerCase()) {
+      // Conflict detected
       return {
         success: false,
-        layer: "identity",
+        layer: "IMM",
         conflict: {
           existingFact: existing,
-          newValue: detection.extractedValue,
+          newValue: extraction.value,
           suggestedAction: existing.confidence > 0.8 ? "ask_user" : "update",
         },
-        message: `Conflict: existing ${detection.extractedKey}="${existing.value}" vs new "${detection.extractedValue}"`,
+        message: `Conflict: ${extraction.key}="${existing.value}" vs "${extraction.value}"`,
       };
     } else {
-      // Same value, reinforce confidence
+      // Reinforce existing
       await updateIdentityConfidence(existing.id, existing.confidence + 0.1);
       return {
         success: true,
-        layer: "identity",
+        layer: "IMM",
         message: "Identity fact reinforced",
       };
     }
   }
   
-  // New identity fact
+  // Create new fact
   const newFact: IdentityFact = {
-    id: `identity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    key: detection.extractedKey,
-    value: detection.extractedValue,
-    category: detection.extractedKey === "name" ? "identity" : "preference",
-    confidence: detection.confidence,
+    id: generateId("imm"),
+    key: extraction.key,
+    value: extraction.value,
+    category: extraction.key === "name" ? "identity" : "preference",
+    confidence: 0.8,
     confirmationCount: 1,
     lastConfirmed: new Date().toISOString(),
     createdAt: new Date().toISOString(),
@@ -271,32 +268,33 @@ const writeIdentity = async (
   
   return {
     success: true,
-    layer: "identity",
-    message: `Stored identity fact: ${detection.extractedKey}=${detection.extractedValue}`,
+    layer: "IMM",
+    message: `Stored: ${extraction.key}=${extraction.value}`,
   };
 };
 
-// Write to Experience Memory (hybrid)
+// Write to Experience Memory
 const writeExperience = async (
   content: string,
   role: "user" | "assistant",
   context: ContextType
 ): Promise<WriteResult> => {
   const importance = calculateImportance(content, role);
+  const detectedContext = detectContext(content) || context;
   
   let embedding: number[] | undefined;
   if (getEmbeddingStatus() === "ready") {
     try {
       embedding = await generateEmbedding(content);
     } catch (error) {
-      console.warn("Could not generate embedding for experience:", error);
+      console.warn("Could not generate embedding:", error);
     }
   }
   
   const entry: ExperienceEntry = {
-    id: `exp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    id: generateId("emm"),
     content,
-    context,
+    context: detectedContext,
     timestamp: new Date().toISOString(),
     importance,
     originalImportance: importance,
@@ -308,21 +306,18 @@ const writeExperience = async (
   
   return {
     success: true,
-    layer: "experience",
-    message: `Stored experience in ${context} context`,
+    layer: "EMM",
+    message: `Stored experience in ${detectedContext} context`,
   };
 };
 
 // Write to Knowledge Memory
-const writeKnowledge = async (
-  content: string,
-  detection: ReturnType<typeof detectMemoryIntent>
-): Promise<WriteResult> => {
+const writeKnowledge = async (content: string): Promise<WriteResult> => {
   if (getEmbeddingStatus() !== "ready") {
     return {
       success: false,
-      layer: "knowledge",
-      message: "Embeddings not ready for knowledge storage",
+      layer: "KMM",
+      message: "Embeddings not ready",
     };
   }
   
@@ -330,9 +325,9 @@ const writeKnowledge = async (
     const embedding = await generateEmbedding(content);
     
     const entry: KnowledgeEntry = {
-      id: `know-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: generateId("kmm"),
       content,
-      category: detection.isKnowledgeStatement ? "skill" : "fact",
+      category: "skill",
       embedding,
       confidence: 0.6,
       reinforcementCount: 0,
@@ -343,19 +338,19 @@ const writeKnowledge = async (
     
     return {
       success: true,
-      layer: "knowledge",
+      layer: "KMM",
       message: "Stored as knowledge",
     };
   } catch (error) {
     return {
       success: false,
-      layer: "knowledge",
-      message: `Failed to store knowledge: ${error}`,
+      layer: "KMM",
+      message: `Failed: ${error}`,
     };
   }
 };
 
-// Resolve conflict by updating identity
+// Resolve conflict
 export const resolveConflict = async (
   conflict: MemoryConflict,
   action: "keep_existing" | "update_new" | "ask_later"
@@ -364,14 +359,39 @@ export const resolveConflict = async (
     const updatedFact: IdentityFact = {
       ...conflict.existingFact,
       value: conflict.newValue,
-      confidence: 0.7, // Reset confidence for updated value
+      confidence: 0.7,
       confirmationCount: 1,
       lastConfirmed: new Date().toISOString(),
     };
     await addIdentityFact(updatedFact);
   } else if (action === "keep_existing") {
-    // Reinforce existing
-    await updateIdentityConfidence(conflict.existingFact.id, conflict.existingFact.confidence + 0.1);
+    await updateIdentityConfidence(
+      conflict.existingFact.id, 
+      conflict.existingFact.confidence + 0.1
+    );
   }
-  // "ask_later" does nothing, conflict remains for next time
 };
+
+// Teach router when it made a mistake
+export const teachRouter = async (
+  text: string,
+  correctLayer: Layer
+): Promise<void> => {
+  await router.learn(text, [], correctLayer);
+};
+
+// Re-exports for convenience
+export {
+  getAllIdentityFacts,
+  clearIdentityMemory,
+  getIdentityCount,
+  getAllExperiences,
+  clearExperienceMemory,
+  getExperienceCount,
+  applyExperienceDecay,
+  getAllKnowledge,
+  clearKnowledgeMemory,
+  getKnowledgeCount,
+};
+
+export { detectContext };

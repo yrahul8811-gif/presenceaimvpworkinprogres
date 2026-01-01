@@ -4,34 +4,24 @@ import {
   writeMemory, 
   resolveConflict,
   cleanupLegacyDatabases,
-  type RetrievalOptions,
-  type WriteResult
-} from "@/lib/memory";
-import {
+  initMemorySystem,
   getAllIdentityFacts,
   clearIdentityMemory,
   getIdentityCount,
-} from "@/lib/memory/identityStore";
-import {
   clearExperienceMemory,
   getExperienceCount,
   applyExperienceDecay,
-} from "@/lib/memory/experienceStore";
-import {
   clearKnowledgeMemory,
   getKnowledgeCount,
-} from "@/lib/memory/knowledgeStore";
-import type { 
-  MemoryResult, 
-  ContextType, 
-  IdentityFact,
-  MemoryConflict 
-} from "@/lib/memory/types";
-import { 
-  initEmbeddings, 
-  onStatusChange, 
-  type EmbeddingStatus 
-} from "@/lib/embeddings";
+  onStatusChange,
+  type RetrievalOptions,
+  type WriteResult,
+  type MemoryResult,
+  type ContextType,
+  type IdentityFact,
+  type MemoryConflict,
+  type EmbeddingStatus,
+} from "@/lib/memory";
 
 export interface MemoryCounts {
   identity: number;
@@ -98,16 +88,16 @@ export const useMemorySystem = () => {
     };
   }, [refreshCounts]);
 
-  // Initialize embedding model
+  // Initialize memory system (router + embeddings)
   const initializeModel = useCallback(async () => {
     try {
-      await initEmbeddings();
+      await initMemorySystem();
     } catch (error) {
-      console.error("Failed to initialize embeddings:", error);
+      console.error("Failed to initialize memory system:", error);
     }
   }, []);
 
-  // Store memory with automatic layer routing
+  // Store memory with ML-based routing
   const storeMemory = useCallback(async (
     content: string,
     role: "user" | "assistant",
@@ -129,7 +119,7 @@ export const useMemorySystem = () => {
     }
   }, [refreshCounts]);
 
-  // Retrieve memories following precedence: Identity → Experience → Knowledge
+  // Retrieve memories following precedence: IMM → EMM → KMM
   const recallMemories = useCallback(async (
     query: string,
     options?: RetrievalOptions
@@ -199,9 +189,9 @@ export const useMemorySystem = () => {
     if (memories.length === 0) return "";
 
     const grouped = {
-      identity: memories.filter(m => m.layer === "identity"),
-      experience: memories.filter(m => m.layer === "experience"),
-      knowledge: memories.filter(m => m.layer === "knowledge"),
+      identity: memories.filter(m => m.layer === "IMM"),
+      experience: memories.filter(m => m.layer === "EMM"),
+      knowledge: memories.filter(m => m.layer === "KMM"),
     };
 
     const parts: string[] = [];
