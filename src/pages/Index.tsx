@@ -515,7 +515,6 @@ CRITICAL MEMORY RULES:
       <div className="flex items-center justify-between">
         <ChatHeader
           onMenuClick={() => setIsMemoryOpen(true)}
-          onNewChat={handleNewChat}
         />
         <div className="pr-4">
           <MemoryStatus
