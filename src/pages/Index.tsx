@@ -556,8 +556,8 @@ CRITICAL MEMORY RULES:
       <MemoryPanel
         isOpen={isMemoryOpen}
         onClose={() => setIsMemoryOpen(false)}
-        conversations={conversations}
         onClearMemory={handleClearMemory}
+        onRefresh={refreshCounts}
       />
 
       <MemoryBrowser
