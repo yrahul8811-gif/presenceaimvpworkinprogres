@@ -125,6 +125,31 @@ export const reinforceKnowledge = async (id: string): Promise<void> => {
   });
 };
 
+export const updateKnowledge = async (
+  id: string,
+  updates: Partial<Pick<KnowledgeEntry, "content" | "category">>
+): Promise<void> => {
+  const database = await initKnowledgeDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORE_NAME], "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const getRequest = store.get(id);
+    
+    getRequest.onsuccess = () => {
+      const entry = getRequest.result as KnowledgeEntry;
+      if (entry) {
+        const updatedEntry = { ...entry, ...updates };
+        const putRequest = store.put(updatedEntry);
+        putRequest.onerror = () => reject(putRequest.error);
+        putRequest.onsuccess = () => resolve();
+      } else {
+        resolve();
+      }
+    };
+    getRequest.onerror = () => reject(getRequest.error);
+  });
+};
+
 export const deleteKnowledge = async (id: string): Promise<void> => {
   const database = await initKnowledgeDB();
   return new Promise((resolve, reject) => {

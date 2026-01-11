@@ -108,6 +108,31 @@ export const updateIdentityConfidence = async (
   });
 };
 
+export const updateIdentityFact = async (
+  id: string,
+  updates: Partial<Pick<IdentityFact, "key" | "value" | "category">>
+): Promise<void> => {
+  const database = await initIdentityDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORE_NAME], "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const getRequest = store.get(id);
+    
+    getRequest.onsuccess = () => {
+      const fact = getRequest.result as IdentityFact;
+      if (fact) {
+        const updatedFact = { ...fact, ...updates };
+        const putRequest = store.put(updatedFact);
+        putRequest.onerror = () => reject(putRequest.error);
+        putRequest.onsuccess = () => resolve();
+      } else {
+        resolve();
+      }
+    };
+    getRequest.onerror = () => reject(getRequest.error);
+  });
+};
+
 export const deleteIdentityFact = async (id: string): Promise<void> => {
   const database = await initIdentityDB();
   return new Promise((resolve, reject) => {
