@@ -39,16 +39,19 @@ export {
 
 // Store-level access (for MemoryBrowser/MemoryPanel)
 export {
+  addIdentityFact,
   deleteIdentityFact,
   updateIdentityFact,
 } from "./stores/identityStore";
 
 export {
+  addExperience,
   deleteExperience,
   updateExperience,
 } from "./stores/experienceStore";
 
 export {
+  addKnowledge,
   deleteKnowledge,
   updateKnowledge,
 } from "./stores/knowledgeStore";
