@@ -37,17 +37,20 @@ export {
   type RetrievalOptions,
 } from "./memorySystem";
 
-// Store-level access (for MemoryBrowser)
+// Store-level access (for MemoryBrowser/MemoryPanel)
 export {
   deleteIdentityFact,
+  updateIdentityFact,
 } from "./stores/identityStore";
 
 export {
   deleteExperience,
+  updateExperience,
 } from "./stores/experienceStore";
 
 export {
   deleteKnowledge,
+  updateKnowledge,
 } from "./stores/knowledgeStore";
 
 // Router access

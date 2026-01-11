@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Key, Trash2, Brain, MessageSquare, Lightbulb, RefreshCw } from "lucide-react";
+import { X, Key, Trash2, Brain, MessageSquare, Lightbulb, RefreshCw, Pencil, Check, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -7,6 +7,12 @@ import {
   getAllIdentityFacts,
   getAllExperiences,
   getAllKnowledge,
+  updateIdentityFact,
+  updateExperience,
+  updateKnowledge,
+  deleteIdentityFact,
+  deleteExperience,
+  deleteKnowledge,
   type IdentityFact,
   type ExperienceEntry,
   type KnowledgeEntry,
@@ -19,6 +25,13 @@ interface MemoryPanelProps {
   onRefresh: () => void;
 }
 
+type EditingState = {
+  type: "identity" | "experience" | "knowledge";
+  id: string;
+  field: string;
+  value: string;
+} | null;
+
 const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelProps) => {
   const [apiKey, setApiKey] = useState("");
   const [isConnected, setIsConnected] = useState(false);
@@ -26,6 +39,7 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
   const [experiences, setExperiences] = useState<ExperienceEntry[]>([]);
   const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [editing, setEditing] = useState<EditingState>(null);
 
   const loadMemories = async () => {
     setIsLoading(true);
@@ -36,7 +50,7 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
         getAllKnowledge(),
       ]);
       setIdentityFacts(facts);
-      setExperiences(exps.slice(0, 20)); // Limit for performance
+      setExperiences(exps.slice(0, 20));
       setKnowledge(know.slice(0, 20));
     } catch (e) {
       console.error("Error loading memories:", e);
@@ -83,6 +97,96 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  // Edit handlers
+  const startEditing = (type: "identity" | "experience" | "knowledge", id: string, field: string, value: string) => {
+    setEditing({ type, id, field, value });
+  };
+
+  const cancelEditing = () => {
+    setEditing(null);
+  };
+
+  const saveEditing = async () => {
+    if (!editing) return;
+    
+    try {
+      if (editing.type === "identity") {
+        await updateIdentityFact(editing.id, { [editing.field]: editing.value });
+      } else if (editing.type === "experience") {
+        await updateExperience(editing.id, { [editing.field]: editing.value });
+      } else if (editing.type === "knowledge") {
+        await updateKnowledge(editing.id, { [editing.field]: editing.value });
+      }
+      setEditing(null);
+      loadMemories();
+      onRefresh();
+    } catch (e) {
+      console.error("Error saving edit:", e);
+    }
+  };
+
+  // Delete handlers
+  const handleDeleteIdentity = async (id: string) => {
+    await deleteIdentityFact(id);
+    loadMemories();
+    onRefresh();
+  };
+
+  const handleDeleteExperience = async (id: string) => {
+    await deleteExperience(id);
+    loadMemories();
+    onRefresh();
+  };
+
+  const handleDeleteKnowledge = async (id: string) => {
+    await deleteKnowledge(id);
+    loadMemories();
+    onRefresh();
+  };
+
+  const renderEditableField = (
+    type: "identity" | "experience" | "knowledge",
+    id: string,
+    field: string,
+    value: string,
+    className: string = ""
+  ) => {
+    const isEditing = editing?.type === type && editing?.id === id && editing?.field === field;
+    
+    if (isEditing) {
+      return (
+        <div className="flex items-center gap-1">
+          <Input
+            value={editing.value}
+            onChange={(e) => setEditing({ ...editing, value: e.target.value })}
+            className="h-6 text-xs py-0 px-1"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveEditing();
+              if (e.key === "Escape") cancelEditing();
+            }}
+          />
+          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={saveEditing}>
+            <Check className="h-3 w-3 text-mood-calm" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={cancelEditing}>
+            <XCircle className="h-3 w-3 text-destructive" />
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <span
+        className={`cursor-pointer hover:bg-muted/50 rounded px-0.5 ${className}`}
+        onClick={() => startEditing(type, id, field, value)}
+        title="Click to edit"
+      >
+        {value}
+      </span>
+    );
   };
 
   return (
@@ -177,12 +281,28 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
                   </p>
                 ) : (
                   identityFacts.map((fact) => (
-                    <div key={fact.id} className="text-sm border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                    <div key={fact.id} className="text-sm border-b border-border/50 pb-2 last:border-0 last:pb-0 group">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-foreground capitalize">{fact.key}</span>
-                        <span className="text-xs text-muted-foreground">{fact.category}</span>
+                        <span className="font-medium text-foreground capitalize">
+                          {renderEditableField("identity", fact.id, "key", fact.key)}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground">
+                            {renderEditableField("identity", fact.id, "category", fact.category)}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => handleDeleteIdentity(fact.id)}
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-foreground/80">{fact.value}</p>
+                      <p className="text-foreground/80">
+                        {renderEditableField("identity", fact.id, "value", fact.value)}
+                      </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Confirmed {fact.confirmationCount}x • {fact.source}
                       </p>
@@ -210,14 +330,26 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
                   </p>
                 ) : (
                   experiences.map((exp) => (
-                    <div key={exp.id} className="text-xs border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                    <div key={exp.id} className="text-xs border-b border-border/50 pb-2 last:border-0 last:pb-0 group">
                       <div className="flex items-center justify-between mb-1">
                         <span className={`font-medium ${exp.role === "user" ? "text-primary" : "text-muted-foreground"}`}>
                           {exp.role === "user" ? "You" : "AI"}
                         </span>
-                        <span className="text-muted-foreground">{formatTime(exp.timestamp)}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">{formatTime(exp.timestamp)}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => handleDeleteExperience(exp.id)}
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-foreground/80 line-clamp-2">{exp.content}</p>
+                      <p className="text-foreground/80 line-clamp-2">
+                        {renderEditableField("experience", exp.id, "content", exp.content)}
+                      </p>
                       <div className="flex gap-2 mt-1 text-muted-foreground">
                         <span>ctx: {exp.context}</span>
                         <span>imp: {(exp.importance * 100).toFixed(0)}%</span>
@@ -246,12 +378,26 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
                   </p>
                 ) : (
                   knowledge.map((k) => (
-                    <div key={k.id} className="text-xs border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                    <div key={k.id} className="text-xs border-b border-border/50 pb-2 last:border-0 last:pb-0 group">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-foreground capitalize">{k.category}</span>
-                        <span className="text-muted-foreground">×{k.reinforcementCount}</span>
+                        <span className="font-medium text-foreground capitalize">
+                          {renderEditableField("knowledge", k.id, "category", k.category)}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">×{k.reinforcementCount}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => handleDeleteKnowledge(k.id)}
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-foreground/80 line-clamp-2">{k.content}</p>
+                      <p className="text-foreground/80 line-clamp-2">
+                        {renderEditableField("knowledge", k.id, "content", k.content)}
+                      </p>
                     </div>
                   ))
                 )}
