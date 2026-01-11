@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Key, Trash2, Brain, MessageSquare, Lightbulb, RefreshCw, Pencil, Check, XCircle } from "lucide-react";
+import { X, Key, Trash2, Brain, MessageSquare, Lightbulb, RefreshCw, Check, XCircle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -7,6 +7,9 @@ import {
   getAllIdentityFacts,
   getAllExperiences,
   getAllKnowledge,
+  addIdentityFact,
+  addExperience,
+  addKnowledge,
   updateIdentityFact,
   updateExperience,
   updateKnowledge,
@@ -32,6 +35,25 @@ type EditingState = {
   value: string;
 } | null;
 
+type AddingState = {
+  type: "identity" | "experience" | "knowledge";
+} | null;
+
+type NewIdentityForm = {
+  key: string;
+  value: string;
+  category: string;
+};
+
+type NewExperienceForm = {
+  content: string;
+};
+
+type NewKnowledgeForm = {
+  content: string;
+  category: string;
+};
+
 const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelProps) => {
   const [apiKey, setApiKey] = useState("");
   const [isConnected, setIsConnected] = useState(false);
@@ -40,6 +62,10 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
   const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [editing, setEditing] = useState<EditingState>(null);
+  const [adding, setAdding] = useState<AddingState>(null);
+  const [newIdentity, setNewIdentity] = useState<NewIdentityForm>({ key: "", value: "", category: "preference" });
+  const [newExperience, setNewExperience] = useState<NewExperienceForm>({ content: "" });
+  const [newKnowledge, setNewKnowledge] = useState<NewKnowledgeForm>({ content: "", category: "fact" });
 
   const loadMemories = async () => {
     setIsLoading(true);
@@ -146,6 +172,70 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
     onRefresh();
   };
 
+  // Add handlers
+  const handleAddIdentity = async () => {
+    if (!newIdentity.key.trim() || !newIdentity.value.trim()) return;
+    
+    const fact: IdentityFact = {
+      id: `identity-${Date.now()}`,
+      key: newIdentity.key.trim(),
+      value: newIdentity.value.trim(),
+      category: newIdentity.category as IdentityFact["category"],
+      confidence: 1,
+      source: "explicit",
+      createdAt: new Date().toISOString(),
+      lastConfirmed: new Date().toISOString(),
+      confirmationCount: 1,
+    };
+    
+    await addIdentityFact(fact);
+    setNewIdentity({ key: "", value: "", category: "preference" });
+    setAdding(null);
+    loadMemories();
+    onRefresh();
+  };
+
+  const handleAddExperience = async () => {
+    if (!newExperience.content.trim()) return;
+    
+    const entry: ExperienceEntry = {
+      id: `exp-${Date.now()}`,
+      content: newExperience.content.trim(),
+      role: "user",
+      context: "general",
+      timestamp: new Date().toISOString(),
+      importance: 0.7,
+      originalImportance: 0.7,
+      embedding: [],
+    };
+    
+    await addExperience(entry);
+    setNewExperience({ content: "" });
+    setAdding(null);
+    loadMemories();
+    onRefresh();
+  };
+
+  const handleAddKnowledge = async () => {
+    if (!newKnowledge.content.trim()) return;
+    
+    const entry: KnowledgeEntry = {
+      id: `know-${Date.now()}`,
+      content: newKnowledge.content.trim(),
+      category: newKnowledge.category,
+      embedding: [],
+      confidence: 1,
+      reinforcementCount: 1,
+      timestamp: new Date().toISOString(),
+    };
+    
+    await addKnowledge(entry);
+    setNewKnowledge({ content: "", category: "fact" });
+    setAdding(null);
+    loadMemories();
+    onRefresh();
+  };
+
   const renderEditableField = (
     type: "identity" | "experience" | "knowledge",
     id: string,
@@ -187,6 +277,115 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
         {value}
       </span>
     );
+  };
+
+  const renderAddForm = (type: "identity" | "experience" | "knowledge") => {
+    if (adding?.type !== type) {
+      return (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full mt-2 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => setAdding({ type })}
+        >
+          <Plus className="h-3 w-3 mr-1" />
+          Add {type}
+        </Button>
+      );
+    }
+
+    if (type === "identity") {
+      return (
+        <div className="mt-2 p-2 bg-muted/50 rounded-lg space-y-2">
+          <Input
+            placeholder="Key (e.g., name, preference)"
+            value={newIdentity.key}
+            onChange={(e) => setNewIdentity({ ...newIdentity, key: e.target.value })}
+            className="h-7 text-xs"
+            autoFocus
+          />
+          <Input
+            placeholder="Value"
+            value={newIdentity.value}
+            onChange={(e) => setNewIdentity({ ...newIdentity, value: e.target.value })}
+            className="h-7 text-xs"
+            onKeyDown={(e) => e.key === "Enter" && handleAddIdentity()}
+          />
+          <select
+            value={newIdentity.category}
+            onChange={(e) => setNewIdentity({ ...newIdentity, category: e.target.value })}
+            className="w-full h-7 text-xs bg-background border border-border rounded px-2"
+          >
+            <option value="preference">Preference</option>
+            <option value="boundary">Boundary</option>
+            <option value="value">Value</option>
+            <option value="identity">Identity</option>
+          </select>
+          <div className="flex gap-2">
+            <Button size="sm" className="flex-1 h-7 text-xs" onClick={handleAddIdentity}>
+              <Check className="h-3 w-3 mr-1" /> Save
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAdding(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    if (type === "experience") {
+      return (
+        <div className="mt-2 p-2 bg-muted/50 rounded-lg space-y-2">
+          <Input
+            placeholder="Experience content"
+            value={newExperience.content}
+            onChange={(e) => setNewExperience({ content: e.target.value })}
+            className="h-7 text-xs"
+            autoFocus
+            onKeyDown={(e) => e.key === "Enter" && handleAddExperience()}
+          />
+          <div className="flex gap-2">
+            <Button size="sm" className="flex-1 h-7 text-xs" onClick={handleAddExperience}>
+              <Check className="h-3 w-3 mr-1" /> Save
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAdding(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    if (type === "knowledge") {
+      return (
+        <div className="mt-2 p-2 bg-muted/50 rounded-lg space-y-2">
+          <Input
+            placeholder="Knowledge content"
+            value={newKnowledge.content}
+            onChange={(e) => setNewKnowledge({ ...newKnowledge, content: e.target.value })}
+            className="h-7 text-xs"
+            autoFocus
+            onKeyDown={(e) => e.key === "Enter" && handleAddKnowledge()}
+          />
+          <Input
+            placeholder="Category"
+            value={newKnowledge.category}
+            onChange={(e) => setNewKnowledge({ ...newKnowledge, category: e.target.value })}
+            className="h-7 text-xs"
+          />
+          <div className="flex gap-2">
+            <Button size="sm" className="flex-1 h-7 text-xs" onClick={handleAddKnowledge}>
+              <Check className="h-3 w-3 mr-1" /> Save
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAdding(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -309,6 +508,7 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
                     </div>
                   ))
                 )}
+                {renderAddForm("identity")}
               </div>
             </div>
 
@@ -357,6 +557,7 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
                     </div>
                   ))
                 )}
+                {renderAddForm("experience")}
               </div>
             </div>
 
@@ -401,6 +602,7 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
                     </div>
                   ))
                 )}
+                {renderAddForm("knowledge")}
               </div>
             </div>
 
