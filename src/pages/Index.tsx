@@ -134,11 +134,9 @@ const Index = () => {
 
       try {
         // Recall memories using 3-layer system
-        let memoryContext = "";
-        if (memoryStatus === "ready") {
-          const memories = await recallMemories(text, { topK: 5, contextFilter: currentContext });
-          memoryContext = formatMemoriesForPrompt(memories);
-        }
+        // Always retrieve - identity facts don't need embeddings, semantic search is optional
+        const memories = await recallMemories(text, { topK: 5, contextFilter: currentContext });
+        const memoryContext = formatMemoriesForPrompt(memories);
 
         const conversationHistory = conversations.slice(-10).map((c) => ({
           role: c.role === "user" ? "user" : "assistant",
