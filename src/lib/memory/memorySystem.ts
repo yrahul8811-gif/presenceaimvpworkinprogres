@@ -72,10 +72,11 @@ export const retrieveMemories = async (
 
   const results: MemoryResult[] = [];
 
-  // Step 1: Query Identity Memory first (exact, highest priority)
+  // Step 1: Query Identity Memory first (ALWAYS include ALL identity facts - highest priority)
   if (includeIdentity) {
-    const identityResults = await searchIdentityFacts(query);
-    for (const fact of identityResults.slice(0, 3)) {
+    // Get ALL identity facts, not just query-matched ones - identity should always be in context
+    const allIdentityFacts = await getAllIdentityFacts();
+    for (const fact of allIdentityFacts) {
       if (fact.confidence >= CONFIDENCE_THRESHOLD) {
         results.push({
           layer: "IMM",
