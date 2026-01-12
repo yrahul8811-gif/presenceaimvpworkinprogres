@@ -3,6 +3,8 @@ import { X, Key, Trash2, Brain, MessageSquare, Lightbulb, RefreshCw, Check, XCir
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { generateEmbedding } from "@/lib/memory/embeddings";
+import { detectContext } from "@/lib/memory";
 import {
   getAllIdentityFacts,
   getAllExperiences,
@@ -197,18 +199,28 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
 
   const handleAddExperience = async () => {
     if (!newExperience.content.trim()) return;
-    
+
+    const content = newExperience.content.trim();
+    const context = detectContext(content);
+
+    let embedding: number[] | undefined;
+    try {
+      embedding = await generateEmbedding(content);
+    } catch (e) {
+      console.warn("Failed to generate embedding for experience:", e);
+    }
+
     const entry: ExperienceEntry = {
       id: `exp-${Date.now()}`,
-      content: newExperience.content.trim(),
+      content,
       role: "user",
-      context: "general",
+      context,
       timestamp: new Date().toISOString(),
       importance: 0.7,
       originalImportance: 0.7,
-      embedding: [],
+      ...(embedding && embedding.length > 0 ? { embedding } : {}),
     };
-    
+
     await addExperience(entry);
     setNewExperience({ content: "" });
     setAdding(null);
@@ -218,17 +230,28 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
 
   const handleAddKnowledge = async () => {
     if (!newKnowledge.content.trim()) return;
-    
+
+    const content = newKnowledge.content.trim();
+    const category = newKnowledge.category?.trim() || "fact";
+
+    let embedding: number[];
+    try {
+      embedding = await generateEmbedding(content);
+    } catch (e) {
+      console.error("Failed to generate embedding for knowledge:", e);
+      return;
+    }
+
     const entry: KnowledgeEntry = {
       id: `know-${Date.now()}`,
-      content: newKnowledge.content.trim(),
-      category: newKnowledge.category,
-      embedding: [],
+      content,
+      category,
+      embedding,
       confidence: 1,
       reinforcementCount: 1,
       timestamp: new Date().toISOString(),
     };
-    
+
     await addKnowledge(entry);
     setNewKnowledge({ content: "", category: "fact" });
     setAdding(null);

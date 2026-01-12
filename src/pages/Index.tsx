@@ -67,6 +67,11 @@ const Index = () => {
   } = useMemorySystem();
 
   useEffect(() => {
+    // Initialize router + embeddings early so Experience/Knowledge memories can be recalled
+    initializeModel();
+  }, [initializeModel]);
+
+  useEffect(() => {
     const saved = localStorage.getItem("secondLayerMemory");
     if (saved) {
       try {
@@ -135,7 +140,7 @@ const Index = () => {
       try {
         // Recall memories using 3-layer system
         // Always retrieve - identity facts don't need embeddings, semantic search is optional
-        const memories = await recallMemories(text, { topK: 5, contextFilter: currentContext });
+        const memories = await recallMemories(text, { topK: 5, contextFilter: detectedContext });
         const memoryContext = formatMemoriesForPrompt(memories);
 
         const conversationHistory = conversations.slice(-10).map((c) => ({
@@ -374,6 +379,10 @@ CRITICAL MEMORY RULES:
         ]);
 
         try {
+          const detectedContext = detectContext(newContent);
+          const memories = await recallMemories(newContent, { topK: 5, contextFilter: detectedContext });
+          const memoryContext = formatMemoriesForPrompt(memories);
+
           const conversationHistory = conversations.slice(-10).map((c) => ({
             role: c.role === "user" ? "user" : "assistant",
             content: c.content,
@@ -388,7 +397,7 @@ CRITICAL MEMORY RULES:
             body: JSON.stringify({
               model: "gpt-3.5-turbo",
               messages: [
-                { role: "system", content: buildSystemPrompt(currentMood) },
+                { role: "system", content: buildSystemPrompt(currentMood, memoryContext) },
                 ...conversationHistory,
                 { role: "user", content: newContent },
               ],
@@ -454,6 +463,10 @@ CRITICAL MEMORY RULES:
       ]);
 
       try {
+        const detectedContext = detectContext(userMessage.content);
+        const memories = await recallMemories(userMessage.content, { topK: 5, contextFilter: detectedContext });
+        const memoryContext = formatMemoriesForPrompt(memories);
+
         const conversationHistory = conversations.slice(-10).map((c) => ({
           role: c.role === "user" ? "user" : "assistant",
           content: c.content,
@@ -468,7 +481,7 @@ CRITICAL MEMORY RULES:
           body: JSON.stringify({
             model: "gpt-3.5-turbo",
             messages: [
-              { role: "system", content: buildSystemPrompt(currentMood) },
+              { role: "system", content: buildSystemPrompt(currentMood, memoryContext) },
               ...conversationHistory,
               { role: "user", content: userMessage.content },
             ],
