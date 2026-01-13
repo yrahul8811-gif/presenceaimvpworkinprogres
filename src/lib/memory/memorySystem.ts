@@ -92,60 +92,186 @@ export const retrieveMemories = async (
     }
   }
 
-  // Step 2: Query Experience Memory (semantic search)
-  if (includeExperience && getEmbeddingStatus() === "ready") {
-    try {
-      const queryEmbedding = await generateEmbedding(query);
-      const contextExperiences = await searchExperiencesSemantic(
-        queryEmbedding,
-        topK,
-        semanticThreshold,
-        contextFilter
-      );
-      
-      for (const exp of contextExperiences) {
-        results.push({
-          layer: "EMM",
-          content: exp.content,
-          confidence: exp.importance,
-          similarity: exp.similarity,
-          timestamp: exp.timestamp,
-          metadata: { 
-            context: exp.context, 
-            role: exp.role 
-          },
-        });
+  // Helpers for keyword fallback when embeddings are unavailable or yield no matches
+  const tokenize = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
+
+  const keywordSimilarity = (queryText: string, targetText: string): number => {
+    const q = new Set(tokenize(queryText));
+    const t = new Set(tokenize(targetText));
+    if (q.size === 0 || t.size === 0) return 0;
+    let overlap = 0;
+    q.forEach((tok) => {
+      if (t.has(tok)) overlap++;
+    });
+    return overlap / Math.sqrt(q.size * t.size);
+  };
+
+  // Step 2: Query Experience Memory
+  if (includeExperience) {
+    let addedAny = false;
+
+    // 2a) Semantic search when embeddings are ready
+    if (getEmbeddingStatus() === "ready") {
+      try {
+        const queryEmbedding = await generateEmbedding(query);
+        const contextExperiences = await searchExperiencesSemantic(
+          queryEmbedding,
+          topK,
+          semanticThreshold,
+          contextFilter
+        );
+
+        if (contextExperiences.length > 0) {
+          for (const exp of contextExperiences) {
+            results.push({
+              layer: "EMM",
+              content: exp.content,
+              confidence: exp.importance,
+              similarity: exp.similarity,
+              timestamp: exp.timestamp,
+              metadata: {
+                context: exp.context,
+                role: exp.role,
+              },
+            });
+          }
+          addedAny = true;
+        } else if (contextFilter) {
+          // If context-filtered semantic search returns nothing, retry without context.
+          const allContextExperiences = await searchExperiencesSemantic(
+            queryEmbedding,
+            topK,
+            semanticThreshold,
+            undefined
+          );
+          for (const exp of allContextExperiences) {
+            results.push({
+              layer: "EMM",
+              content: exp.content,
+              confidence: exp.importance,
+              similarity: exp.similarity,
+              timestamp: exp.timestamp,
+              metadata: {
+                context: exp.context,
+                role: exp.role,
+              },
+            });
+          }
+          addedAny = allContextExperiences.length > 0;
+        }
+      } catch (error) {
+        console.warn("Experience semantic search failed; falling back to keyword:", error);
       }
-    } catch (error) {
-      console.warn("Experience search failed:", error);
+    }
+
+    // 2b) Keyword fallback (works for manual entries even without embeddings)
+    if (!addedAny) {
+      try {
+        const all = await getAllExperiences();
+        const tryWithContext = (ctx?: ContextType) =>
+          all
+            .filter((e) => (ctx ? e.context === ctx : true))
+            .map((e) => ({
+              entry: e,
+              score: keywordSimilarity(query, e.content) * (e.importance ?? 0.5),
+            }))
+            .filter((x) => x.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, topK);
+
+        let scored = tryWithContext(contextFilter);
+        if (scored.length === 0 && contextFilter) scored = tryWithContext(undefined);
+
+        for (const { entry, score } of scored) {
+          results.push({
+            layer: "EMM",
+            content: entry.content,
+            confidence: entry.importance,
+            similarity: score,
+            timestamp: entry.timestamp,
+            metadata: {
+              context: entry.context,
+              role: entry.role,
+              retrieval: "keyword",
+            },
+          });
+        }
+      } catch (error) {
+        console.warn("Experience keyword fallback failed:", error);
+      }
     }
   }
 
-  // Step 3: Query Knowledge Memory (semantic search)
-  if (includeKnowledge && getEmbeddingStatus() === "ready") {
-    try {
-      const queryEmbedding = await generateEmbedding(query);
-      const knowledgeResults = await searchKnowledgeSemantic(
-        queryEmbedding,
-        topK,
-        semanticThreshold * 0.8
-      );
-      
-      for (const know of knowledgeResults) {
-        results.push({
-          layer: "KMM",
-          content: know.content,
-          confidence: know.confidence,
-          similarity: know.similarity,
-          timestamp: know.timestamp,
-          metadata: { 
-            category: know.category,
-            reinforcementCount: know.reinforcementCount 
-          },
-        });
+  // Step 3: Query Knowledge Memory
+  if (includeKnowledge) {
+    let addedAny = false;
+
+    // 3a) Semantic search when embeddings are ready
+    if (getEmbeddingStatus() === "ready") {
+      try {
+        const queryEmbedding = await generateEmbedding(query);
+        const knowledgeResults = await searchKnowledgeSemantic(
+          queryEmbedding,
+          topK,
+          semanticThreshold * 0.8
+        );
+
+        if (knowledgeResults.length > 0) {
+          for (const know of knowledgeResults) {
+            results.push({
+              layer: "KMM",
+              content: know.content,
+              confidence: know.confidence,
+              similarity: know.similarity,
+              timestamp: know.timestamp,
+              metadata: {
+                category: know.category,
+                reinforcementCount: know.reinforcementCount,
+              },
+            });
+          }
+          addedAny = true;
+        }
+      } catch (error) {
+        console.warn("Knowledge semantic search failed; falling back to keyword:", error);
       }
-    } catch (error) {
-      console.warn("Knowledge search failed:", error);
+    }
+
+    // 3b) Keyword fallback
+    if (!addedAny) {
+      try {
+        const all = await getAllKnowledge();
+        const scored = all
+          .map((k) => ({
+            entry: k,
+            score: keywordSimilarity(query, k.content) * (k.confidence ?? 0.6),
+          }))
+          .filter((x) => x.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, topK);
+
+        for (const { entry, score } of scored) {
+          results.push({
+            layer: "KMM",
+            content: entry.content,
+            confidence: entry.confidence,
+            similarity: score,
+            timestamp: entry.timestamp,
+            metadata: {
+              category: entry.category,
+              reinforcementCount: entry.reinforcementCount,
+              retrieval: "keyword",
+            },
+          });
+        }
+      } catch (error) {
+        console.warn("Knowledge keyword fallback failed:", error);
+      }
     }
   }
 
