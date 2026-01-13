@@ -124,14 +124,11 @@ export const useMemorySystem = () => {
     query: string,
     options?: RetrievalOptions
   ): Promise<MemoryResult[]> => {
+    // Even when embeddings aren't ready, we still want manual memories to be usable.
+    // The memory system will fall back to keyword matching for Experience/Knowledge.
     if (status !== "ready") {
-      console.warn("Embeddings not ready for semantic search");
-      // Still return identity facts (don't need embeddings)
-      return retrieveMemories(query, {
-        ...options,
-        includeExperience: false,
-        includeKnowledge: false,
-      });
+      console.warn("Embeddings not ready for semantic search; using keyword fallback");
+      return retrieveMemories(query, options);
     }
 
     setIsProcessing(true);
