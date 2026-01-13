@@ -68,4 +68,5 @@ export {
 } from "./embeddings";
 
 // Utils
-export { cleanupLegacyDatabases, calculateImportance } from "./utils";
+// Utils
+export { cleanupLegacyDatabases, calculateImportance, wipeAllMemoryDatabases } from "./utils";

@@ -6,8 +6,9 @@ import MemoryPanel from "@/components/MemoryPanel";
 import MemoryStatus from "@/components/MemoryStatus";
 import MemoryBrowser from "@/components/MemoryBrowser";
 import { useMemorySystem } from "@/hooks/useMemorySystem";
-import { detectContext, type ContextType } from "@/lib/memory";
+import { detectContext, wipeAllMemoryDatabases, type ContextType } from "@/lib/memory";
 import type { MoodType } from "@/components/MoodSelector";
+
 interface MessageAttachment {
   id: string;
   name: string;
@@ -38,6 +39,9 @@ const MOODS: Record<MoodType, string> = {
   blunt: "Blunt",
 };
 
+// Version key for one-time memory wipe (increment to trigger new wipe)
+const MEMORY_VERSION = "v2-dedupe";
+
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -65,6 +69,19 @@ const Index = () => {
     refreshCounts,
     formatMemoriesForPrompt,
   } = useMemorySystem();
+
+  // One-time memory wipe on version change (clears duplicate/corrupt data)
+  useEffect(() => {
+    const lastVersion = localStorage.getItem("presence-memory-version");
+    if (lastVersion !== MEMORY_VERSION) {
+      console.log("Memory version changed, wiping all databases...");
+      wipeAllMemoryDatabases().then(() => {
+        localStorage.setItem("presence-memory-version", MEMORY_VERSION);
+        localStorage.removeItem("secondLayerMemory");
+        console.log("Memory wipe complete. Fresh start!");
+      });
+    }
+  }, []);
 
   useEffect(() => {
     // Initialize router + embeddings early so Experience/Knowledge memories can be recalled
