@@ -38,8 +38,30 @@ export const initKnowledgeDB = (): Promise<IDBDatabase> => {
   });
 };
 
+// Add knowledge with duplicate detection based on embedding similarity
 export const addKnowledge = async (entry: KnowledgeEntry): Promise<void> => {
   const database = await initKnowledgeDB();
+  
+  // Check for duplicates based on content similarity
+  const existing = await getAllKnowledge();
+  const isDuplicate = existing.some(k => {
+    // Exact content match
+    if (k.content.toLowerCase().trim() === entry.content.toLowerCase().trim()) {
+      return true;
+    }
+    // If both have embeddings, check cosine similarity > 0.95
+    if (k.embedding && entry.embedding && k.embedding.length > 0 && entry.embedding.length > 0) {
+      const similarity = cosineSimilarity(k.embedding, entry.embedding);
+      return similarity > 0.95;
+    }
+    return false;
+  });
+  
+  if (isDuplicate) {
+    console.log("Skipping duplicate knowledge:", entry.content.substring(0, 50));
+    return;
+  }
+  
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORE_NAME], "readwrite");
     const store = transaction.objectStore(STORE_NAME);

@@ -38,14 +38,38 @@ export const initIdentityDB = (): Promise<IDBDatabase> => {
   });
 };
 
+// Add or update identity fact - enforces ONE record per key
 export const addIdentityFact = async (fact: IdentityFact): Promise<void> => {
   const database = await initIdentityDB();
+  
+  // First, delete any existing facts with the same key to enforce uniqueness
+  const existing = await getAllByKey(fact.key, database);
+  
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORE_NAME], "readwrite");
     const store = transaction.objectStore(STORE_NAME);
+    
+    // Delete all existing facts with this key
+    for (const old of existing) {
+      store.delete(old.id);
+    }
+    
+    // Add the new fact
     const request = store.put(fact);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve();
+  });
+};
+
+// Helper to get all facts by key (internal use)
+const getAllByKey = async (key: string, database: IDBDatabase): Promise<IdentityFact[]> => {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORE_NAME], "readonly");
+    const store = transaction.objectStore(STORE_NAME);
+    const index = store.index("key");
+    const request = index.getAll(key);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result || []);
   });
 };
 

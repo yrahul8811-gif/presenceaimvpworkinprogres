@@ -70,6 +70,39 @@ export const cleanupLegacyDatabases = async (): Promise<void> => {
   }
 };
 
+// Wipe all memory databases completely (for fresh start)
+export const wipeAllMemoryDatabases = async (): Promise<void> => {
+  const dbNames = [
+    "presence-ai-identity",
+    "presence-ai-experiences", 
+    "presence-ai-knowledge",
+    "presence-ai-router",
+    "presence-ai-memory", // legacy
+  ];
+  
+  for (const dbName of dbNames) {
+    try {
+      await new Promise<void>((resolve) => {
+        const deleteRequest = indexedDB.deleteDatabase(dbName);
+        deleteRequest.onsuccess = () => {
+          console.log(`Wiped database: ${dbName}`);
+          resolve();
+        };
+        deleteRequest.onerror = () => {
+          console.warn(`Failed to wipe database: ${dbName}`);
+          resolve();
+        };
+        deleteRequest.onblocked = () => {
+          console.warn(`Database wipe blocked: ${dbName}`);
+          resolve();
+        };
+      });
+    } catch (error) {
+      console.warn(`Error wiping ${dbName}:`, error);
+    }
+  }
+};
+
 // Context detection
 const CONTEXT_KEYWORDS: Record<string, string[]> = {
   family: ["mom", "dad", "mother", "father", "parent", "sibling", "brother", "sister", "family", "home", "grandma", "grandpa", "aunt", "uncle", "cousin", "wife", "husband", "spouse", "kid", "child", "son", "daughter"],

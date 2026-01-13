@@ -44,8 +44,30 @@ export const initExperienceDB = (): Promise<IDBDatabase> => {
   });
 };
 
+// Add experience with duplicate detection based on content similarity
 export const addExperience = async (entry: ExperienceEntry): Promise<void> => {
   const database = await initExperienceDB();
+  
+  // Check for duplicates based on content similarity
+  const existing = await getAllExperiences();
+  const isDuplicate = existing.some(e => {
+    // Exact content match
+    if (e.content.toLowerCase().trim() === entry.content.toLowerCase().trim()) {
+      return true;
+    }
+    // If both have embeddings, check cosine similarity > 0.95
+    if (e.embedding && entry.embedding && e.embedding.length > 0 && entry.embedding.length > 0) {
+      const similarity = cosineSimilarity(e.embedding, entry.embedding);
+      return similarity > 0.95;
+    }
+    return false;
+  });
+  
+  if (isDuplicate) {
+    console.log("Skipping duplicate experience:", entry.content.substring(0, 50));
+    return;
+  }
+  
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORE_NAME], "readwrite");
     const store = transaction.objectStore(STORE_NAME);

@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { X, Key, Trash2, Brain, MessageSquare, Lightbulb, RefreshCw, Check, XCircle, Plus } from "lucide-react";
+import { X, Key, Trash2, Brain, MessageSquare, Lightbulb, RefreshCw, Check, XCircle, Plus, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { generateEmbedding } from "@/lib/memory/embeddings";
+import { generateEmbedding, initEmbeddings, getEmbeddingStatus } from "@/lib/memory/embeddings";
 import { detectContext } from "@/lib/memory";
+import { toast } from "sonner";
 import {
   getAllIdentityFacts,
   getAllExperiences,
@@ -18,6 +19,9 @@ import {
   deleteIdentityFact,
   deleteExperience,
   deleteKnowledge,
+  clearIdentityMemory,
+  clearExperienceMemory,
+  clearKnowledgeMemory,
   type IdentityFact,
   type ExperienceEntry,
   type KnowledgeEntry,
@@ -111,11 +115,18 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
     setIsConnected(false);
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
+    // Actually clear the IndexedDB stores
+    await Promise.all([
+      clearIdentityMemory(),
+      clearExperienceMemory(),
+      clearKnowledgeMemory(),
+    ]);
     onClearMemory();
     setIdentityFacts([]);
     setExperiences([]);
     setKnowledge([]);
+    toast.success("All memory cleared");
   };
 
   const formatTime = (timestamp: string) => {
@@ -174,89 +185,130 @@ const MemoryPanel = ({ isOpen, onClose, onClearMemory, onRefresh }: MemoryPanelP
     onRefresh();
   };
 
-  // Add handlers
+  // Add handlers with proper error feedback
   const handleAddIdentity = async () => {
-    if (!newIdentity.key.trim() || !newIdentity.value.trim()) return;
+    if (!newIdentity.key.trim() || !newIdentity.value.trim()) {
+      toast.error("Please fill in both key and value");
+      return;
+    }
     
-    const fact: IdentityFact = {
-      id: `identity-${Date.now()}`,
-      key: newIdentity.key.trim(),
-      value: newIdentity.value.trim(),
-      category: newIdentity.category as IdentityFact["category"],
-      confidence: 1,
-      source: "explicit",
-      createdAt: new Date().toISOString(),
-      lastConfirmed: new Date().toISOString(),
-      confirmationCount: 1,
-    };
-    
-    await addIdentityFact(fact);
-    setNewIdentity({ key: "", value: "", category: "preference" });
-    setAdding(null);
-    loadMemories();
-    onRefresh();
+    try {
+      const fact: IdentityFact = {
+        id: `identity-${Date.now()}`,
+        key: newIdentity.key.trim().toLowerCase(),
+        value: newIdentity.value.trim(),
+        category: newIdentity.category as IdentityFact["category"],
+        confidence: 1,
+        source: "explicit",
+        createdAt: new Date().toISOString(),
+        lastConfirmed: new Date().toISOString(),
+        confirmationCount: 1,
+      };
+      
+      await addIdentityFact(fact);
+      setNewIdentity({ key: "", value: "", category: "preference" });
+      setAdding(null);
+      await loadMemories();
+      onRefresh();
+      toast.success(`Identity saved: ${fact.key}`);
+    } catch (e) {
+      console.error("Failed to add identity:", e);
+      toast.error("Failed to save identity fact");
+    }
   };
 
   const handleAddExperience = async () => {
-    if (!newExperience.content.trim()) return;
-
-    const content = newExperience.content.trim();
-    const context = detectContext(content);
-
-    let embedding: number[] | undefined;
-    try {
-      embedding = await generateEmbedding(content);
-    } catch (e) {
-      console.warn("Failed to generate embedding for experience:", e);
-    }
-
-    const entry: ExperienceEntry = {
-      id: `exp-${Date.now()}`,
-      content,
-      role: "user",
-      context,
-      timestamp: new Date().toISOString(),
-      importance: 0.7,
-      originalImportance: 0.7,
-      ...(embedding && embedding.length > 0 ? { embedding } : {}),
-    };
-
-    await addExperience(entry);
-    setNewExperience({ content: "" });
-    setAdding(null);
-    loadMemories();
-    onRefresh();
-  };
-
-  const handleAddKnowledge = async () => {
-    if (!newKnowledge.content.trim()) return;
-
-    const content = newKnowledge.content.trim();
-    const category = newKnowledge.category?.trim() || "fact";
-
-    let embedding: number[];
-    try {
-      embedding = await generateEmbedding(content);
-    } catch (e) {
-      console.error("Failed to generate embedding for knowledge:", e);
+    if (!newExperience.content.trim()) {
+      toast.error("Please enter content for the experience");
       return;
     }
 
-    const entry: KnowledgeEntry = {
-      id: `know-${Date.now()}`,
-      content,
-      category,
-      embedding,
-      confidence: 1,
-      reinforcementCount: 1,
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const content = newExperience.content.trim();
+      const context = detectContext(content);
 
-    await addKnowledge(entry);
-    setNewKnowledge({ content: "", category: "fact" });
-    setAdding(null);
-    loadMemories();
-    onRefresh();
+      // Ensure embeddings are initialized
+      if (getEmbeddingStatus() !== "ready") {
+        toast.info("Initializing memory system...");
+        await initEmbeddings();
+      }
+
+      let embedding: number[] | undefined;
+      try {
+        embedding = await generateEmbedding(content);
+      } catch (e) {
+        console.warn("Failed to generate embedding for experience:", e);
+        // Continue without embedding - keyword fallback will work
+      }
+
+      const entry: ExperienceEntry = {
+        id: `exp-${Date.now()}`,
+        content,
+        role: "user",
+        context,
+        timestamp: new Date().toISOString(),
+        importance: 0.8,
+        originalImportance: 0.8,
+        ...(embedding && embedding.length > 0 ? { embedding } : {}),
+      };
+
+      await addExperience(entry);
+      setNewExperience({ content: "" });
+      setAdding(null);
+      await loadMemories();
+      onRefresh();
+      toast.success("Experience saved");
+    } catch (e) {
+      console.error("Failed to add experience:", e);
+      toast.error("Failed to save experience");
+    }
+  };
+
+  const handleAddKnowledge = async () => {
+    if (!newKnowledge.content.trim()) {
+      toast.error("Please enter content for the knowledge");
+      return;
+    }
+
+    try {
+      const content = newKnowledge.content.trim();
+      const category = newKnowledge.category?.trim() || "fact";
+
+      // Ensure embeddings are initialized
+      if (getEmbeddingStatus() !== "ready") {
+        toast.info("Initializing memory system...");
+        await initEmbeddings();
+      }
+
+      let embedding: number[];
+      try {
+        embedding = await generateEmbedding(content);
+      } catch (e) {
+        console.error("Failed to generate embedding for knowledge:", e);
+        toast.error("Could not generate embedding - please try again");
+        return;
+      }
+
+      const entry: KnowledgeEntry = {
+        id: `know-${Date.now()}`,
+        content,
+        category,
+        embedding,
+        confidence: 1,
+        reinforcementCount: 1,
+        timestamp: new Date().toISOString(),
+      };
+
+      await addKnowledge(entry);
+      setNewKnowledge({ content: "", category: "fact" });
+      setAdding(null);
+      await loadMemories();
+      onRefresh();
+      toast.success("Knowledge saved");
+    } catch (e) {
+      console.error("Failed to add knowledge:", e);
+      toast.error("Failed to save knowledge");
+    }
   };
 
   const renderEditableField = (
