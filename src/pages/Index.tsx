@@ -43,14 +43,7 @@ const MOODS: Record<MoodType, string> = {
 const MEMORY_VERSION = "v2-dedupe";
 
 const Index = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      content: "Hello! I'm Presence AI. Set your mood and start chatting. Add your OpenAI API key in the menu!",
-      sender: "ai",
-      timestamp: new Date().toISOString(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [currentMood, setCurrentMood] = useState<MoodType>("calm");
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [isMemoryBrowserOpen, setIsMemoryBrowserOpen] = useState(false);
