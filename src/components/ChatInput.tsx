@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, ReactNode } from "react";
 import { Paperclip, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import MoodSelector, { type MoodType } from "./MoodSelector";
@@ -16,9 +16,10 @@ interface ChatInputProps {
   onSend: (message: string, attachments?: Attachment[]) => void;
   currentMood: MoodType;
   onMoodChange: (mood: MoodType) => void;
+  voiceChatSlot?: ReactNode;
 }
 
-const ChatInput = ({ onSend, currentMood, onMoodChange }: ChatInputProps) => {
+const ChatInput = ({ onSend, currentMood, onMoodChange, voiceChatSlot }: ChatInputProps) => {
   const [message, setMessage] = useState("");
   const [showAttachment, setShowAttachment] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -189,26 +190,31 @@ const ChatInput = ({ onSend, currentMood, onMoodChange }: ChatInputProps) => {
         </Button>
       </div>
 
-      {/* Moods Row */}
-      <div className="flex items-center gap-3 px-1">
-        <div className="relative">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowAttachment(!showAttachment)}
-            className="w-9 h-9 rounded-full bg-muted/50 hover:bg-muted"
-          >
-            <Paperclip className="w-4 h-4 text-muted-foreground" />
-          </Button>
-          
-          <AttachmentMenu
-            isOpen={showAttachment}
-            onClose={() => setShowAttachment(false)}
-            onSelect={handleAttachmentSelect}
-          />
+      {/* Moods Row with Voice Chat */}
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowAttachment(!showAttachment)}
+              className="w-9 h-9 rounded-full bg-muted/50 hover:bg-muted"
+            >
+              <Paperclip className="w-4 h-4 text-muted-foreground" />
+            </Button>
+            
+            <AttachmentMenu
+              isOpen={showAttachment}
+              onClose={() => setShowAttachment(false)}
+              onSelect={handleAttachmentSelect}
+            />
+          </div>
+
+          <MoodSelector currentMood={currentMood} onMoodChange={onMoodChange} />
         </div>
 
-        <MoodSelector currentMood={currentMood} onMoodChange={onMoodChange} />
+        {/* Voice Chat Controls */}
+        {voiceChatSlot}
       </div>
     </div>
   );

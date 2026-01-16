@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import ChatHeader from "@/components/ChatHeader";
 import ChatMessage from "@/components/ChatMessage";
 import ChatInput, { type Attachment } from "@/components/ChatInput";
 import MemoryPanel from "@/components/MemoryPanel";
 import MemoryStatus from "@/components/MemoryStatus";
 import MemoryBrowser from "@/components/MemoryBrowser";
+import { VoiceChat } from "@/components/VoiceChat";
 import { useMemorySystem } from "@/hooks/useMemorySystem";
 import { detectContext, wipeAllMemoryDatabases, type ContextType } from "@/lib/memory";
 import type { MoodType } from "@/components/MoodSelector";
@@ -48,6 +49,8 @@ const Index = () => {
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [isMemoryBrowserOpen, setIsMemoryBrowserOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationEntry[]>([]);
+  const [isAiSpeaking, setIsAiSpeaking] = useState(false);
+  const [lastAiMessage, setLastAiMessage] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [currentContext, setCurrentContext] = useState<ContextType>("general");
   
@@ -196,6 +199,7 @@ const Index = () => {
           timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, aiMessage]);
+        setLastAiMessage(aiResponse);
 
         saveConversation({
           role: "assistant",
@@ -572,6 +576,14 @@ CRITICAL MEMORY RULES:
         onSend={handleSendMessage}
         currentMood={currentMood}
         onMoodChange={handleMoodChange}
+        voiceChatSlot={
+          <VoiceChat
+            onTranscript={handleSendMessage}
+            lastAiMessage={lastAiMessage}
+            isAiSpeaking={isAiSpeaking}
+            onSpeakingChange={setIsAiSpeaking}
+          />
+        }
       />
 
       <MemoryPanel
